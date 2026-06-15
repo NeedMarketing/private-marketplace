@@ -54,6 +54,7 @@ export default function SellPage() {
   const [imageFiles, setImageFiles] = useState<{ preview: string; file: File }[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [publishedId, setPublishedId] = useState('')
+  const [error, setError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -84,7 +85,7 @@ export default function SellPage() {
         const { data, error } = await supabase.storage
           .from('listing-images')
           .upload(path, file, { cacheControl: '3600', upsert: false })
-        if (error) { console.error('Upload failed:', error); return null }
+        if (error) throw new Error(`Image upload failed: ${error.message}`)
         const { data: { publicUrl } } = supabase.storage.from('listing-images').getPublicUrl(data.path)
         return publicUrl
       })
@@ -95,6 +96,7 @@ export default function SellPage() {
   const publish = async () => {
     if (!user) return
     setSubmitting(true)
+    setError('')
     try {
       const imageUrls = await uploadImages()
       const supabase = createClient()
@@ -121,12 +123,27 @@ export default function SellPage() {
           images: imageUrls,
           status: 'active',
         })
-        .select()
+        .select('id')
         .single()
-      if (error) { console.error(error); setSubmitting(false); return }
+      if (error) {
+        // Log the full error object (message, details, hint, code) for debugging
+        console.error('Listing insert failed:', error)
+        const friendly = error.code === '23503'
+          ? 'Your seller profile could not be found. Please log out and back in, then try again.'
+          : error.message || 'Something went wrong while publishing. Please try again.'
+        setError(friendly)
+        setSubmitting(false)
+        return
+      }
+      if (!data) {
+        setError('The listing was not created. Please try again.')
+        setSubmitting(false)
+        return
+      }
       setPublishedId(data.id)
     } catch (e) {
-      console.error(e)
+      console.error('Publish failed:', e)
+      setError(e instanceof Error ? e.message : 'Something went wrong while publishing. Please try again.')
       setSubmitting(false)
     }
   }
@@ -158,7 +175,7 @@ export default function SellPage() {
     )
   }
 
-  const sellerName = profile?.full_name || user.email || ''
+  const sellerName = profile?.full_name || 'You'
 
   return (
     <div className="min-h-screen bg-[#FAFAF7]">
@@ -405,6 +422,16 @@ export default function SellPage() {
                 <li>· Your contact info is kept private until you choose to share it</li>
               </ul>
             </div>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-start gap-2.5">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 mt-0.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <div>
+                  <p className="text-[13px] font-semibold text-red-700">Couldn&apos;t publish your listing</p>
+                  <p className="text-[12px] text-red-600 mt-0.5">{error}</p>
+                </div>
+              </div>
+            )}
 
             <button
               onClick={publish}
