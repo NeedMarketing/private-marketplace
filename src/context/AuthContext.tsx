@@ -32,15 +32,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // createClient only called inside useEffect — never during SSR
     const supabase = createClient()
 
-    const fetchProfile = async (userId: string) => {
-      const { data } = await supabase.from('profiles').select('id, full_name, phone, user_type, created_at, updated_at').eq('id', userId).single()
-      setProfile(data)
+    // Profile fetch is intentionally NOT awaited on the critical path — pages only
+    // need user.id to start loading their data. Blocking `loading` on this extra
+    // round-trip is what made gated pages slow.
+    const fetchProfile = (userId: string) => {
+      supabase.from('profiles').select('id, full_name, phone, user_type, created_at, updated_at').eq('id', userId).single()
+        .then(({ data }) => setProfile(data))
     }
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    // getSession() reads the session from local storage / cookie (no network),
+    // so we can resolve `loading` immediately on first paint.
+    supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user)
-        await fetchProfile(session.user.id)
+        fetchProfile(session.user.id)
+      }
+      setLoading(false)
+    })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser(session.user)
+        fetchProfile(session.user.id)
       } else {
         setUser(null)
         setProfile(null)
