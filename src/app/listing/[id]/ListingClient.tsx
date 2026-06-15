@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Navbar from '@/components/Navbar'
+import Comments from '@/components/Comments'
 import { useAuth } from '@/context/AuthContext'
 import { createClient } from '@/lib/supabase/client'
 import { notifyNewMessage } from '@/lib/push'
@@ -17,11 +18,39 @@ export default function ListingClient({ initialListing }: { initialListing: List
   const [activeImg, setActiveImg] = useState(0)
   const [messaging, setMessaging] = useState(false)
   const [msgError, setMsgError] = useState('')
-  const [saved, setSaved] = useState(false)
   const [interested, setInterested] = useState(false)
+  const [likeCount, setLikeCount] = useState(0)
+  const [liked, setLiked] = useState(false)
   const touchStartX = useRef<number | null>(null)
 
   const isOwner = user && listing.seller_id === user.id
+
+  // Load the persistent like count + whether the current user has liked it.
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.from('listing_likes').select('id', { count: 'exact', head: true }).eq('listing_id', listing.id)
+      .then(({ count }) => setLikeCount(count || 0))
+    if (user) {
+      supabase.from('listing_likes').select('id').eq('listing_id', listing.id).eq('user_id', user.id).maybeSingle()
+        .then(({ data }) => setLiked(!!data))
+    } else {
+      setLiked(false)
+    }
+  }, [listing.id, user])
+
+  const toggleLike = async () => {
+    if (!user) { router.push(`/auth/login?next=/listing/${listing.id}`); return }
+    const supabase = createClient()
+    if (liked) {
+      setLiked(false); setLikeCount((c) => Math.max(0, c - 1))
+      const { error } = await supabase.from('listing_likes').delete().eq('listing_id', listing.id).eq('user_id', user.id)
+      if (error) { setLiked(true); setLikeCount((c) => c + 1); alert(error.message) }
+    } else {
+      setLiked(true); setLikeCount((c) => c + 1)
+      const { error } = await supabase.from('listing_likes').insert({ listing_id: listing.id, user_id: user.id })
+      if (error) { setLiked(false); setLikeCount((c) => Math.max(0, c - 1)); console.error(error) }
+    }
+  }
   const sellerName = (listing.profiles as { full_name: string; phone: string } | undefined)?.full_name || 'Private Seller'
   const sellerPhone = (listing.profiles as { full_name: string; phone: string } | undefined)?.phone || ''
 
@@ -244,6 +273,9 @@ export default function ListingClient({ initialListing }: { initialListing: List
               </div>
             )}
 
+            {/* Comments */}
+            <Comments listingId={listing.id} />
+
             {/* Safety tips */}
             <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5">
               <div className="flex items-center gap-2 mb-3">
@@ -300,8 +332,9 @@ export default function ListingClient({ initialListing }: { initialListing: List
                         <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg> I&apos;m interested</>
                       )}
                     </button>
-                    <button onClick={() => setSaved(!saved)} className={`w-full border text-[13px] font-medium py-2.5 rounded-xl transition-colors mt-1 ${saved ? 'border-[#111111] text-[#111111]' : 'border-[#E5E5E5] text-[#6B6B6B] hover:border-[#111111] hover:text-[#111111]'}`}>
-                      {saved ? '✓ Saved' : 'Save listing'}
+                    <button onClick={toggleLike} className={`w-full border text-[13px] font-medium py-2.5 rounded-xl transition-colors mt-1 flex items-center justify-center gap-2 ${liked ? 'border-[#111111] text-[#111111]' : 'border-[#E5E5E5] text-[#6B6B6B] hover:border-[#111111] hover:text-[#111111]'}`}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill={liked ? '#ef4444' : 'none'} stroke={liked ? '#ef4444' : 'currentColor'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                      {liked ? 'Saved' : 'Save'}{likeCount > 0 ? ` · ${likeCount}` : ''}
                     </button>
                   </>
                 )}
