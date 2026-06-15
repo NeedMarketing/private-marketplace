@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Navbar from '@/components/Navbar'
 import ImageCropper from '@/components/ImageCropper'
+import LocationInput from '@/components/LocationInput'
 import { useAuth } from '@/context/AuthContext'
 import { createClient } from '@/lib/supabase/client'
 import { formatPrice } from '@/lib/utils'
@@ -57,6 +58,7 @@ export default function SellPage() {
   const [submitting, setSubmitting] = useState(false)
   const [publishedId, setPublishedId] = useState('')
   const [error, setError] = useState('')
+  const [vinStatus, setVinStatus] = useState<'idle' | 'decoding' | 'done' | 'error'>('idle')
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -64,6 +66,39 @@ export default function SellPage() {
   }, [user, loading, router])
 
   const set = (k: keyof FormState, v: unknown) => setForm((f) => ({ ...f, [k]: v }))
+
+  // Decode a 17-char VIN via the free NHTSA vPIC API and auto-fill year/make/model.
+  const decodeVin = async (vin: string) => {
+    setVinStatus('decoding')
+    try {
+      const res = await fetch(`https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/${vin}?format=json`)
+      const json = await res.json()
+      const r = json?.Results?.[0]
+      if (!r || (!r.Make && !r.Model && !r.ModelYear)) { setVinStatus('error'); return }
+      setForm((f) => {
+        const next = { ...f }
+        if (r.ModelYear && Number(r.ModelYear)) next.year = Number(r.ModelYear)
+        if (r.Make) {
+          // Normalize NHTSA's uppercase make to our list's casing when possible.
+          const m = String(r.Make)
+          const match = MAKES.find((x) => x.toLowerCase() === m.toLowerCase())
+          next.make = match || (m.charAt(0) + m.slice(1).toLowerCase())
+        }
+        if (r.Model) next.model = String(r.Model)
+        return next
+      })
+      setVinStatus('done')
+    } catch {
+      setVinStatus('error')
+    }
+  }
+
+  const onVinChange = (raw: string) => {
+    const vin = raw.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 17)
+    set('vin', vin)
+    if (vin.length === 17) decodeVin(vin)
+    else setVinStatus('idle')
+  }
 
   const addImages = (files: FileList) => {
     // Queue selected images for cropping (max 8 total across existing + queued).
@@ -254,8 +289,11 @@ export default function SellPage() {
                 <input value={form.mileage || ''} onChange={(e) => set('mileage', Number(e.target.value))} type="number" min="0" placeholder="e.g. 45000" className={inp} />
               </div>
               <div>
-                <label className="block text-[12px] font-semibold text-[#111111] mb-1.5">VIN <span className="text-[11px] font-normal text-[#6B6B6B]">(optional)</span></label>
-                <input value={form.vin} onChange={(e) => set('vin', e.target.value.toUpperCase())} placeholder="17-character VIN" maxLength={17} className={inp + ' font-mono text-[13px]'} />
+                <label className="block text-[12px] font-semibold text-[#111111] mb-1.5">VIN <span className="text-[11px] font-normal text-[#6B6B6B]">(optional — auto-fills year/make/model)</span></label>
+                <input value={form.vin} onChange={(e) => onVinChange(e.target.value)} placeholder="17-character VIN" maxLength={17} className={inp + ' font-mono text-[13px]'} />
+                {vinStatus === 'decoding' && <p className="text-[11px] text-[#6B6B6B] mt-1 flex items-center gap-1"><span className="w-3 h-3 border-2 border-[#6B6B6B] border-t-transparent rounded-full animate-spin inline-block" /> Looking up VIN…</p>}
+                {vinStatus === 'done' && <p className="text-[11px] text-emerald-600 mt-1">✓ Found — year, make &amp; model filled in. You can adjust if needed.</p>}
+                {vinStatus === 'error' && <p className="text-[11px] text-[#6B6B6B] mt-1">Couldn&apos;t decode that VIN — enter the details manually.</p>}
               </div>
             </div>
           </div>
@@ -368,7 +406,7 @@ export default function SellPage() {
             </div>
             <div>
               <label className="block text-[12px] font-semibold text-[#111111] mb-1.5">Location <span className="text-red-500">*</span></label>
-              <input value={form.location} onChange={(e) => set('location', e.target.value)} placeholder="e.g. Los Angeles, CA" className={inp} />
+              <LocationInput value={form.location} onChange={(v) => set('location', v)} className={inp} />
             </div>
             <div>
               <label className="block text-[12px] font-semibold text-[#111111] mb-1.5">Seller description</label>
