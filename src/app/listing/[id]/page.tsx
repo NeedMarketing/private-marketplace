@@ -181,11 +181,11 @@ export default function ListingPage({ params }: { params: { id: string } }) {
 
           {/* Left column */}
           <div>
-            {/* Main image — swipeable carousel. Fixed wide frame; the full photo is
-                always shown centered (never cropped) and the side space is filled with
-                a soft blurred copy of the same photo instead of empty white. */}
+            {/* Main image — swipeable carousel. Fills the wide frame uniformly
+                (crop-to-fill, like the browse card). Tall photos lose a little
+                top/bottom but the hero always looks clean and full-width. */}
             <div
-              className="relative rounded-2xl overflow-hidden shadow-[0_2px_20px_rgba(0,0,0,0.08)] mb-3 w-full h-[clamp(360px,60vh,600px)] select-none"
+              className="relative rounded-2xl overflow-hidden shadow-[0_2px_20px_rgba(0,0,0,0.08)] mb-3 w-full h-[clamp(360px,55vh,520px)] bg-[#F5F5F3] select-none"
               onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX }}
               onTouchEnd={(e) => {
                 if (touchStartX.current === null || listing.images.length < 2) return
@@ -195,18 +195,10 @@ export default function ListingPage({ params }: { params: { id: string } }) {
                 touchStartX.current = null
               }}
             >
-              {/* blurred fill behind the photo */}
-              <div
-                className="absolute inset-0 bg-center bg-cover scale-110 blur-2xl"
-                style={{ backgroundImage: `url(${storageImage(listing.images[activeImg], { width: 100, quality: 45 }) || 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=100&q=45'})` }}
-              />
-              <div className="absolute inset-0 bg-black/15" />
-
-              {/* full photo, centered, never cropped */}
               <img
                 src={storageImage(listing.images[activeImg], { width: 1200, quality: 82 }) || 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=1200&q=82'}
                 alt={`${listing.year} ${listing.make} ${listing.model}`}
-                className="relative z-10 w-full h-full object-contain"
+                className="w-full h-full object-cover"
               />
 
               {/* prev / next arrows */}
