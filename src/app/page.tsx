@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Navbar from '@/components/Navbar'
+import BetaStats from '@/components/BetaStats'
 import { useAuth } from '@/context/AuthContext'
 import { createClient } from '@/lib/supabase/client'
 import { formatPrice, formatMileage } from '@/lib/utils'
@@ -134,6 +135,11 @@ export default function HomePage() {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* Live beta stats */}
+      <section className="max-w-7xl mx-auto px-5 pb-4">
+        <BetaStats />
       </section>
 
       {/* Featured Listings */}
