@@ -82,8 +82,8 @@ function MyListingCard({ listing, onEdit, onDelete, onMarkSold }: { listing: Lis
     <div className="bg-white border border-[#E5E5E5] rounded-2xl overflow-hidden shadow-[0_2px_12px_rgba(0,0,0,0.05)] hover:shadow-[0_6px_24px_rgba(0,0,0,0.09)] transition-all">
       <div className="relative" style={{ aspectRatio: '16/9' }}>
         <img src={listing.images[0] || 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=480&q=75'} alt="" className="w-full h-full object-cover" />
-        <span className={`absolute top-3 left-3 text-[11px] font-semibold px-2.5 py-1 rounded-full ${listing.status === 'sold' ? 'bg-[#111111] text-white' : 'bg-white text-[#111111]'}`}>
-          {listing.status === 'sold' ? 'Sold' : 'Active'}
+        <span className={`absolute top-3 left-3 text-[11px] font-semibold px-2.5 py-1 rounded-full ${listing.status === 'sold' ? 'bg-[#111111] text-white' : listing.status === 'draft' ? 'bg-amber-100 text-amber-800' : 'bg-white text-[#111111]'}`}>
+          {listing.status === 'sold' ? 'Sold' : listing.status === 'draft' ? 'Draft' : 'Active'}
         </span>
         <div className="absolute top-3 right-3 relative">
           <button onClick={() => setMenuOpen(!menuOpen)} className="w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white transition-colors shadow-sm">
