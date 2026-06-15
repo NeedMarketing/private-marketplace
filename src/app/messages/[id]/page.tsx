@@ -29,28 +29,32 @@ export default function ThreadPage({ params }: { params: { id: string } }) {
     if (!user) return
     const supabase = createClient()
 
-    // Load conversation
-    supabase
-      .from('conversations')
-      .select('*, buyer:buyer_id(full_name), seller:seller_id(full_name)')
-      .eq('id', params.id)
-      .single()
-      .then(({ data }) => {
-        if (!data) { setNotFound(true); return }
-        if (data.buyer_id !== user.id && data.seller_id !== user.id) { router.push('/messages'); return }
-        setConversation(data)
+    // Load conversation + messages in parallel
+    Promise.all([
+      supabase
+        .from('conversations')
+        .select('*, buyer:buyer_id(full_name), seller:seller_id(full_name)')
+        .eq('id', params.id)
+        .single(),
+      supabase
+        .from('messages')
+        .select('id, conversation_id, sender_id, sender_name, text, created_at')
+        .eq('conversation_id', params.id)
+        .order('created_at', { ascending: true }),
+    ]).then(([{ data: conv }, { data: msgs }]) => {
+      if (!conv) { setNotFound(true); return }
+      if (conv.buyer_id !== user.id && conv.seller_id !== user.id) { router.push('/messages'); return }
+      setConversation(conv)
+      setMessages(msgs || [])
 
-        // Load listing
-        supabase.from('listings').select('*').eq('id', data.listing_id).single().then(({ data: l }) => setListing(l))
-      })
-
-    // Load messages
-    supabase
-      .from('messages')
-      .select('*')
-      .eq('conversation_id', params.id)
-      .order('created_at', { ascending: true })
-      .then(({ data }) => setMessages(data || []))
+      // Listing fetch only needs a few fields
+      supabase
+        .from('listings')
+        .select('id, year, make, model, price, location, images')
+        .eq('id', conv.listing_id)
+        .single()
+        .then(({ data: l }) => setListing(l as typeof l & Listing))
+    })
 
     // Realtime subscription for new messages
     const channel = supabase

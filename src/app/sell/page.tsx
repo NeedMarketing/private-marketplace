@@ -76,18 +76,20 @@ export default function SellPage() {
   const uploadImages = async (): Promise<string[]> => {
     if (!user) return []
     const supabase = createClient()
-    const urls: string[] = []
-    for (const { file } of imageFiles) {
-      const ext = file.name.split('.').pop()
-      const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
-      const { data, error } = await supabase.storage
-        .from('listing-images')
-        .upload(path, file, { cacheControl: '3600', upsert: false })
-      if (error) { console.error('Upload failed:', error); continue }
-      const { data: { publicUrl } } = supabase.storage.from('listing-images').getPublicUrl(data.path)
-      urls.push(publicUrl)
-    }
-    return urls
+    // Upload all images in parallel
+    const results = await Promise.all(
+      imageFiles.map(async ({ file }) => {
+        const ext = file.name.split('.').pop()
+        const path = `${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+        const { data, error } = await supabase.storage
+          .from('listing-images')
+          .upload(path, file, { cacheControl: '3600', upsert: false })
+        if (error) { console.error('Upload failed:', error); return null }
+        const { data: { publicUrl } } = supabase.storage.from('listing-images').getPublicUrl(data.path)
+        return publicUrl
+      })
+    )
+    return results.filter((url): url is string => url !== null)
   }
 
   const publish = async () => {

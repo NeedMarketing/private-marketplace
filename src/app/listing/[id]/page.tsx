@@ -86,7 +86,7 @@ export default function ListingPage({ params }: { params: { id: string } }) {
           last_message: '',
           last_message_at: new Date().toISOString(),
         })
-        .select()
+        .select('id')
         .single()
 
       if (error || !conv) { console.error(error); setMessaging(false); return }
@@ -118,7 +118,7 @@ export default function ListingPage({ params }: { params: { id: string } }) {
       .from('listings')
       .update({ status: 'sold' })
       .eq('id', listing.id)
-      .select()
+      .select('*, profiles(full_name, phone)')
       .single()
     if (data) setListing(data)
   }
@@ -330,7 +330,7 @@ function SimilarListings({ currentId, make }: { currentId: string; make: string 
     const supabase = createClient()
     supabase
       .from('listings')
-      .select('*')
+      .select('id, year, make, model, price, mileage, location, images')
       .eq('status', 'active')
       .neq('id', currentId)
       .order('created_at', { ascending: false })
@@ -352,7 +352,7 @@ function SimilarListings({ currentId, make }: { currentId: string; make: string 
           <Link key={l.id} href={`/listing/${l.id}`} className="group block">
             <div className="bg-white rounded-2xl border border-[#E5E5E5] shadow-[0_2px_12px_rgba(0,0,0,0.06)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.09)] transition-all overflow-hidden">
               <div className="relative overflow-hidden" style={{ aspectRatio: '4/3' }}>
-                <img src={l.images[0] || 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=800'} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <img src={l.images[0] || 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=480&q=75'} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
               </div>
               <div className="p-4">
                 <div className="flex items-start justify-between gap-2">

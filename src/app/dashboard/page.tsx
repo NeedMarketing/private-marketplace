@@ -28,7 +28,7 @@ function EditModal({ listing, onSave, onClose }: { listing: Listing; onSave: (l:
       .from('listings')
       .update({ price: Number(form.price), mileage: Number(form.mileage), description: form.description, condition: form.condition })
       .eq('id', listing.id)
-      .select()
+      .select('id, seller_id, year, make, model, trim, price, mileage, location, condition, title_status, color, interior_color, transmission, fuel_type, vin, description, images, contact_preference, status, created_at, updated_at')
       .single()
     if (data) onSave(data)
     onClose()
@@ -81,7 +81,7 @@ function MyListingCard({ listing, onEdit, onDelete, onMarkSold }: { listing: Lis
   return (
     <div className="bg-white border border-[#E5E5E5] rounded-2xl overflow-hidden shadow-[0_2px_12px_rgba(0,0,0,0.05)] hover:shadow-[0_6px_24px_rgba(0,0,0,0.09)] transition-all">
       <div className="relative" style={{ aspectRatio: '16/9' }}>
-        <img src={listing.images[0] || 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=800'} alt="" className="w-full h-full object-cover" />
+        <img src={listing.images[0] || 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=480&q=75'} alt="" className="w-full h-full object-cover" />
         <span className={`absolute top-3 left-3 text-[11px] font-semibold px-2.5 py-1 rounded-full ${listing.status === 'sold' ? 'bg-[#111111] text-white' : 'bg-white text-[#111111]'}`}>
           {listing.status === 'sold' ? 'Sold' : 'Active'}
         </span>
@@ -140,8 +140,8 @@ export default function DashboardPage() {
     if (!user) return
     const supabase = createClient()
     Promise.all([
-      supabase.from('listings').select('*').eq('seller_id', user.id).order('created_at', { ascending: false }),
-      supabase.from('conversations').select('*, buyer:buyer_id(full_name), seller:seller_id(full_name)').or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`).order('last_message_at', { ascending: false }),
+      supabase.from('listings').select('id, seller_id, year, make, model, trim, price, mileage, location, condition, title_status, color, interior_color, transmission, fuel_type, vin, description, images, contact_preference, status, created_at, updated_at').eq('seller_id', user.id).order('created_at', { ascending: false }),
+      supabase.from('conversations').select('id, listing_id, buyer_id, seller_id, listing_title, listing_image, last_message, last_message_at, buyer:buyer_id(full_name), seller:seller_id(full_name)').or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`).order('last_message_at', { ascending: false }),
     ]).then(([{ data: listings }, { data: convs }]) => {
       setMyListings(listings || [])
       setConversations(convs || [])
@@ -161,8 +161,8 @@ export default function DashboardPage() {
   const handleMarkSold = async (id: string) => {
     if (!confirm('Mark this car as sold?')) return
     const supabase = createClient()
-    const { data } = await supabase.from('listings').update({ status: 'sold' }).eq('id', id).select().single()
-    if (data) setMyListings((prev) => prev.map((l) => l.id === id ? data : l))
+    const { data } = await supabase.from('listings').update({ status: 'sold' }).eq('id', id).select('id, status, updated_at').single()
+    if (data) setMyListings((prev) => prev.map((l) => l.id === id ? { ...l, status: 'sold' as const, updated_at: data.updated_at } : l))
   }
 
   const handleSaveProfile = async () => {
@@ -269,7 +269,7 @@ export default function DashboardPage() {
                   return (
                     <Link key={c.id} href={`/messages/${c.id}`} className="bg-white border border-[#E5E5E5] rounded-2xl p-4 flex items-center gap-4 hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)] transition-all">
                       <div className="w-12 h-12 rounded-xl overflow-hidden bg-[#F5F5F3] shrink-0">
-                        <img src={c.listing_image || 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=200'} alt="" className="w-full h-full object-cover" />
+                        <img src={c.listing_image || 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=120&q=70'} alt="" className="w-full h-full object-cover" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-0.5">

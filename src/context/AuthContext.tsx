@@ -33,7 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const supabase = createClient()
 
     const fetchProfile = async (userId: string) => {
-      const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
+      const { data } = await supabase.from('profiles').select('id, full_name, phone, user_type, created_at, updated_at').eq('id', userId).single()
       setProfile(data)
     }
 
@@ -78,7 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .from('profiles')
       .update({ ...data, updated_at: new Date().toISOString() })
       .eq('id', user.id)
-      .select()
+      .select('id, full_name, phone, user_type, created_at, updated_at')
       .single()
     if (updated) setProfile(updated)
   }
