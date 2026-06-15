@@ -79,25 +79,34 @@ function EditModal({ listing, onSave, onClose }: { listing: Listing; onSave: (l:
 function MyListingCard({ listing, onEdit, onDelete, onMarkSold }: { listing: Listing; onEdit: () => void; onDelete: () => void; onMarkSold: () => void }) {
   const [menuOpen, setMenuOpen] = useState(false)
   return (
-    <div className="bg-white border border-[#E5E5E5] rounded-2xl overflow-hidden shadow-[0_2px_12px_rgba(0,0,0,0.05)] hover:shadow-[0_6px_24px_rgba(0,0,0,0.09)] transition-all">
-      <div className="relative" style={{ aspectRatio: '16/9' }}>
+    // NOTE: no `overflow-hidden` on the card — that was clipping the dropdown and
+    // hiding the "Delete listing" item. Rounded corners are handled per-section.
+    // `relative` + elevated z-index when the menu is open keeps the dropdown above
+    // neighbouring cards in the grid.
+    <div className={`relative bg-white border border-[#E5E5E5] rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.05)] hover:shadow-[0_6px_24px_rgba(0,0,0,0.09)] transition-all ${menuOpen ? 'z-30' : ''}`}>
+      <div className="relative rounded-t-2xl overflow-hidden" style={{ aspectRatio: '16/9' }}>
         <img src={listing.images[0] || 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=480&q=75'} alt="" className="w-full h-full object-cover" />
         <span className={`absolute top-3 left-3 text-[11px] font-semibold px-2.5 py-1 rounded-full ${listing.status === 'sold' ? 'bg-[#111111] text-white' : listing.status === 'draft' ? 'bg-amber-100 text-amber-800' : 'bg-white text-[#111111]'}`}>
           {listing.status === 'sold' ? 'Sold' : listing.status === 'draft' ? 'Draft' : 'Active'}
         </span>
-        <div className="absolute top-3 right-3 relative">
-          <button onClick={() => setMenuOpen(!menuOpen)} className="w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white transition-colors shadow-sm">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="#111111"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
-          </button>
-          {menuOpen && (
+      </div>
+      {/* Menu lives directly on the card (outside the image's overflow context) so the dropdown is never clipped. */}
+      <div className="absolute top-3 right-3">
+        <button onClick={() => setMenuOpen(!menuOpen)} className="w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white transition-colors shadow-sm">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="#111111"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+        </button>
+        {menuOpen && (
+          <>
+            {/* click-away overlay so the menu closes when clicking elsewhere */}
+            <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
             <div className="absolute right-0 top-10 bg-white border border-[#E5E5E5] rounded-xl shadow-[0_8px_24px_rgba(0,0,0,0.12)] w-44 py-1.5 z-20">
               <Link href={`/listing/${listing.id}`} onClick={() => setMenuOpen(false)} className="block px-4 py-2.5 text-[13px] text-[#111111] hover:bg-[#F5F5F3]">View listing</Link>
               {listing.status === 'active' && <button onClick={() => { setMenuOpen(false); onEdit() }} className="w-full text-left px-4 py-2.5 text-[13px] text-[#111111] hover:bg-[#F5F5F3]">Edit listing</button>}
               {listing.status === 'active' && <button onClick={() => { setMenuOpen(false); onMarkSold() }} className="w-full text-left px-4 py-2.5 text-[13px] text-[#111111] hover:bg-[#F5F5F3]">Mark as sold</button>}
               <button onClick={() => { setMenuOpen(false); onDelete() }} className="w-full text-left px-4 py-2.5 text-[13px] text-red-500 hover:bg-red-50">Delete listing</button>
             </div>
-          )}
-        </div>
+          </>
+        )}
       </div>
       <div className="p-4">
         <div className="flex items-start justify-between gap-2">
@@ -165,8 +174,10 @@ export default function DashboardPage() {
   if (loading || !user) return <div className="min-h-screen bg-[#FAFAF7] flex items-center justify-center"><div className="w-6 h-6 border-2 border-[#111111] border-t-transparent rounded-full animate-spin" /></div>
 
   const handleDeleteListing = async (id: string) => {
-    if (!confirm('Delete this listing?')) return
+    if (!confirm("Are you sure you want to delete this listing? This can't be undone.")) return
     const supabase = createClient()
+    const target = myListings.find((l) => l.id === id)
+
     // .select() forces the deleted rows to be returned — if RLS blocks the
     // delete, data comes back empty (0 rows) with no error, which we detect.
     const { data, error } = await supabase.from('listings').delete().eq('id', id).select('id')
@@ -175,7 +186,21 @@ export default function DashboardPage() {
       alert('Could not delete listing — you may not have permission, or it was already removed.')
       return
     }
+
+    // Remove from the UI immediately; the "My listings" tab count is derived from
+    // this array, so it updates automatically.
     setMyListings((prev) => prev.filter((l) => l.id !== id))
+
+    // Best-effort storage cleanup. Conversations/messages for this listing are
+    // removed automatically by ON DELETE CASCADE, so the dashboard stays consistent;
+    // image cleanup is non-fatal — a failure here never breaks the UI.
+    const paths = (target?.images || [])
+      .map((url) => url.split('/listing-images/')[1]?.split('?')[0])
+      .filter((p): p is string => !!p)
+    if (paths.length > 0) {
+      const { error: rmErr } = await supabase.storage.from('listing-images').remove(paths)
+      if (rmErr) console.error('Image cleanup failed (non-fatal):', rmErr)
+    }
   }
 
   const handleMarkSold = async (id: string) => {
