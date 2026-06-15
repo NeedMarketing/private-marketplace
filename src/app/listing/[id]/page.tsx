@@ -181,8 +181,8 @@ export default function ListingPage({ params }: { params: { id: string } }) {
           {/* Left column */}
           <div>
             {/* Main image */}
-            <div className="relative rounded-2xl overflow-hidden bg-[#F5F5F3] shadow-[0_2px_20px_rgba(0,0,0,0.08)] mb-3" style={{ aspectRatio: '16/9' }}>
-              <img src={storageImage(listing.images[activeImg], { width: 1000, quality: 80 }) || 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=1000&q=80'} alt={`${listing.year} ${listing.make} ${listing.model}`} className="w-full h-full object-contain" />
+            <div className="relative rounded-2xl overflow-hidden bg-[#0E0E0E] shadow-[0_2px_20px_rgba(0,0,0,0.08)] mb-3 flex items-center justify-center h-[clamp(360px,55vh,560px)]">
+              <img src={storageImage(listing.images[activeImg], { width: 1000, quality: 80 }) || 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=1000&q=80'} alt={`${listing.year} ${listing.make} ${listing.model}`} className="max-w-full max-h-full w-auto h-auto object-contain" />
               {listing.status === 'sold' && (
                 <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                   <span className="text-white text-[28px] font-bold border-4 border-white px-6 py-2 rounded-2xl rotate-[-15deg]">SOLD</span>
