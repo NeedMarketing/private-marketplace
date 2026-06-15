@@ -28,8 +28,8 @@ export type Listing = {
   images: string[]
   contact_preference: 'message' | 'phone' | 'both'
   status: 'active' | 'sold' | 'draft'
-  created_at: string
-  updated_at: string
+  created_at?: string
+  updated_at?: string
   profiles?: { full_name: string; phone: string }
 }
 

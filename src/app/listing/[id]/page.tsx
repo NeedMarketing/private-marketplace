@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import Navbar from '@/components/Navbar'
 import { useAuth } from '@/context/AuthContext'
 import { createClient } from '@/lib/supabase/client'
-import { formatPrice, formatMileage } from '@/lib/utils'
+import { formatPrice, formatMileage, storageImage } from '@/lib/utils'
 import type { Listing } from '@/lib/types'
 
 export default function ListingPage({ params }: { params: { id: string } }) {
@@ -23,11 +23,11 @@ export default function ListingPage({ params }: { params: { id: string } }) {
     const supabase = createClient()
     supabase
       .from('listings')
-      .select('*, profiles(full_name, phone)')
+      .select('id, seller_id, year, make, model, trim, price, mileage, location, condition, title_status, color, interior_color, transmission, fuel_type, vin, description, images, contact_preference, status, profiles(full_name, phone)')
       .eq('id', params.id)
       .single()
       .then(({ data }) => {
-        if (data) setListing(data)
+        if (data) setListing(data as unknown as Listing)
         else setNotFound(true)
       })
   }, [params.id])
@@ -118,9 +118,9 @@ export default function ListingPage({ params }: { params: { id: string } }) {
       .from('listings')
       .update({ status: 'sold' })
       .eq('id', listing.id)
-      .select('*, profiles(full_name, phone)')
+      .select('id, seller_id, year, make, model, trim, price, mileage, location, condition, title_status, color, interior_color, transmission, fuel_type, vin, description, images, contact_preference, status, profiles(full_name, phone)')
       .single()
-    if (data) setListing(data)
+    if (data) setListing(data as unknown as Listing)
   }
 
   const specs = [
@@ -150,7 +150,7 @@ export default function ListingPage({ params }: { params: { id: string } }) {
           <div>
             {/* Main image */}
             <div className="relative rounded-2xl overflow-hidden bg-[#F5F5F3] shadow-[0_2px_20px_rgba(0,0,0,0.08)] mb-3" style={{ aspectRatio: '16/9' }}>
-              <img src={listing.images[activeImg] || 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=900'} alt={`${listing.year} ${listing.make} ${listing.model}`} className="w-full h-full object-cover" />
+              <img src={storageImage(listing.images[activeImg], { width: 1000, quality: 80 }) || 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=1000&q=80'} alt={`${listing.year} ${listing.make} ${listing.model}`} className="w-full h-full object-cover" />
               {listing.status === 'sold' && (
                 <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                   <span className="text-white text-[28px] font-bold border-4 border-white px-6 py-2 rounded-2xl rotate-[-15deg]">SOLD</span>
@@ -163,7 +163,7 @@ export default function ListingPage({ params }: { params: { id: string } }) {
               <div className="flex gap-2.5 overflow-x-auto pb-1 mb-8">
                 {listing.images.map((img, i) => (
                   <button key={i} onClick={() => setActiveImg(i)} className={`relative w-20 h-14 shrink-0 rounded-xl overflow-hidden transition-all ${activeImg === i ? 'ring-2 ring-[#111111]' : 'opacity-55 hover:opacity-80'}`}>
-                    <img src={img} alt="" className="w-full h-full object-cover" />
+                    <img src={storageImage(img, { width: 160, quality: 70 })} alt="" loading="lazy" className="w-full h-full object-cover" />
                   </button>
                 ))}
               </div>
@@ -353,7 +353,7 @@ function SimilarListings({ currentId, make }: { currentId: string; make: string 
           <Link key={l.id} href={`/listing/${l.id}`} className="group block">
             <div className="bg-white rounded-2xl border border-[#E5E5E5] shadow-[0_2px_12px_rgba(0,0,0,0.06)] hover:shadow-[0_8px_24px_rgba(0,0,0,0.09)] transition-all overflow-hidden">
               <div className="relative overflow-hidden" style={{ aspectRatio: '4/3' }}>
-                <img src={l.images[0] || 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=480&q=75'} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                <img src={storageImage(l.images[0], { width: 480, quality: 75 }) || 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=480&q=75'} alt="" loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
               </div>
               <div className="p-4">
                 <div className="flex items-start justify-between gap-2">
