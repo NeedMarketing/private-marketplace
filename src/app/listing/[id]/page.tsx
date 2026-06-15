@@ -16,20 +16,38 @@ export default function ListingPage({ params }: { params: { id: string } }) {
   const [notFound, setNotFound] = useState(false)
   const [activeImg, setActiveImg] = useState(0)
   const [messaging, setMessaging] = useState(false)
+  const [msgError, setMsgError] = useState('')
   const [saved, setSaved] = useState(false)
   const [interested, setInterested] = useState(false)
 
   useEffect(() => {
     const supabase = createClient()
-    supabase
-      .from('listings')
-      .select('id, seller_id, year, make, model, trim, price, mileage, location, condition, title_status, color, interior_color, transmission, fuel_type, vin, description, images, contact_preference, status, profiles(full_name, phone)')
-      .eq('id', params.id)
-      .single()
-      .then(({ data }) => {
-        if (data) setListing(data as unknown as Listing)
-        else setNotFound(true)
-      })
+    const load = async () => {
+      // Fetch the listing WITHOUT embedding the profile, so a broken/missing
+      // seller_id FK relationship or a zero/multi-row profile can never cause
+      // the whole query to error and make a real listing look "not found".
+      // maybeSingle() returns null (no error) when no row matches, instead of
+      // throwing like single() does.
+      const { data: listingData, error } = await supabase
+        .from('listings')
+        .select('id, seller_id, year, make, model, trim, price, mileage, location, condition, title_status, color, interior_color, transmission, fuel_type, vin, description, images, contact_preference, status')
+        .eq('id', params.id)
+        .maybeSingle()
+
+      if (error) { console.error('Listing fetch failed:', error); setNotFound(true); return }
+      if (!listingData) { setNotFound(true); return }
+
+      // Fetch the seller profile separately and resiliently — a missing profile
+      // just means we fall back to "Private Seller", it does NOT block the listing.
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('full_name, phone')
+        .eq('id', listingData.seller_id)
+        .maybeSingle()
+
+      setListing({ ...(listingData as unknown as Listing), profiles: prof || undefined })
+    }
+    load()
   }, [params.id])
 
   if (notFound) {
@@ -60,6 +78,7 @@ export default function ListingPage({ params }: { params: { id: string } }) {
     if (!user) { router.push(`/auth/login?next=/listing/${listing.id}`); return }
     if (isOwner) return
     setMessaging(true)
+    setMsgError('')
     try {
       const supabase = createClient()
       // Upsert conversation (idempotent — same buyer+listing = same conversation)
@@ -89,16 +108,27 @@ export default function ListingPage({ params }: { params: { id: string } }) {
         .select('id')
         .single()
 
-      if (error || !conv) { console.error(error); setMessaging(false); return }
+      if (error || !conv) {
+        console.error('Conversation create failed:', error)
+        setMsgError(error?.message || 'Could not start the conversation. Please try again.')
+        setMessaging(false)
+        return
+      }
 
       // Send intro message
       const introText = `Hi! I'm interested in your ${listing.year} ${listing.make} ${listing.model}. Is it still available?`
-      await supabase.from('messages').insert({
+      const { error: msgErr } = await supabase.from('messages').insert({
         conversation_id: conv.id,
         sender_id: user.id,
         sender_name: profile?.full_name || 'Buyer',
         text: introText,
       })
+      if (msgErr) {
+        console.error('Intro message failed:', msgErr)
+        setMsgError(msgErr.message || 'Could not send your message. Please try again.')
+        setMessaging(false)
+        return
+      }
       await supabase
         .from('conversations')
         .update({ last_message: introText, last_message_at: new Date().toISOString() })
@@ -107,6 +137,7 @@ export default function ListingPage({ params }: { params: { id: string } }) {
       router.push(`/messages/${conv.id}`)
     } catch (e) {
       console.error(e)
+      setMsgError(e instanceof Error ? e.message : 'Something went wrong. Please try again.')
       setMessaging(false)
     }
   }
@@ -114,13 +145,14 @@ export default function ListingPage({ params }: { params: { id: string } }) {
   const handleMarkSold = async () => {
     if (!confirm('Mark this car as sold?')) return
     const supabase = createClient()
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('listings')
       .update({ status: 'sold' })
       .eq('id', listing.id)
-      .select('id, seller_id, year, make, model, trim, price, mileage, location, condition, title_status, color, interior_color, transmission, fuel_type, vin, description, images, contact_preference, status, profiles(full_name, phone)')
+      .select('id, status, updated_at')
       .single()
-    if (data) setListing(data as unknown as Listing)
+    if (error) { console.error('Mark sold failed:', error); alert(error.message); return }
+    if (data) setListing((prev) => prev ? { ...prev, status: 'sold' } : prev)
   }
 
   const specs = [
@@ -259,6 +291,7 @@ export default function ListingPage({ params }: { params: { id: string } }) {
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                       {messaging ? 'Opening chat…' : 'Message seller'}
                     </button>
+                    {msgError && <p className="text-[12px] text-red-600 mb-2">{msgError}</p>}
                     <button onClick={() => { if (!user) { router.push(`/auth/login?next=/listing/${listing.id}`); return } setInterested(true) }} className={`w-full border text-[14px] font-semibold py-3 rounded-xl transition-colors flex items-center justify-center gap-2 ${interested ? 'border-emerald-500 text-emerald-600 bg-emerald-50' : 'border-[#E5E5E5] text-[#111111] hover:border-[#111111]'}`}>
                       {interested ? (
                         <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg> Marked as interested</>

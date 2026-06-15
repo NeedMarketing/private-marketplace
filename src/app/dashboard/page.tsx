@@ -154,7 +154,14 @@ export default function DashboardPage() {
   const handleDeleteListing = async (id: string) => {
     if (!confirm('Delete this listing?')) return
     const supabase = createClient()
-    await supabase.from('listings').delete().eq('id', id)
+    // .select() forces the deleted rows to be returned — if RLS blocks the
+    // delete, data comes back empty (0 rows) with no error, which we detect.
+    const { data, error } = await supabase.from('listings').delete().eq('id', id).select('id')
+    if (error) { console.error('Delete failed:', error); alert(`Could not delete listing: ${error.message}`); return }
+    if (!data || data.length === 0) {
+      alert('Could not delete listing — you may not have permission, or it was already removed.')
+      return
+    }
     setMyListings((prev) => prev.filter((l) => l.id !== id))
   }
 
