@@ -40,7 +40,7 @@ const EMPTY: FormState = {
 
 const STEPS = ['Vehicle', 'Condition', 'Photos', 'Pricing', 'Contact', 'Publish']
 
-const MAKES = ['Acura','Alfa Romeo','Aston Martin','Audi','Bentley','BMW','Buick','Cadillac','Chevrolet','Chrysler','Dodge','Ferrari','Fiat','Ford','GMC','Honda','Hyundai','Infiniti','Jaguar','Jeep','Kia','Lamborghini','Land Rover','Lexus','Lincoln','Maserati','Mazda','McLaren','Mercedes-Benz','MINI','Mitsubishi','Nissan','Porsche','Ram','Rolls-Royce','Subaru','Tesla','Toyota','Volkswagen','Volvo','Other']
+const MAKES = ['Acura','Alfa Romeo','Aston Martin','Audi','Bentley','BMW','Bugatti','Buick','Cadillac','Chevrolet','Chrysler','Dodge','Ferrari','Fiat','Ford','GMC','Honda','Hyundai','Infiniti','Jaguar','Jeep','Kia','Lamborghini','Land Rover','Lexus','Lincoln','Lotus','Maserati','Mazda','McLaren','Mercedes-Benz','MINI','Mitsubishi','Nissan','Porsche','Ram','Rolls-Royce','Subaru','Tesla','Toyota','Volkswagen','Volvo','Other']
 const COLORS = ['Black','White','Silver','Gray','Red','Blue','Green','Brown','Yellow','Orange','Purple','Gold','Beige','Other']
 const TRANSMISSIONS = ['Automatic','Manual','CVT','Semi-Automatic']
 const FUELS = ['Gas','Diesel','Hybrid','Plug-in Hybrid','Electric','Other']

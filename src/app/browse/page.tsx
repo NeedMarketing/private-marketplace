@@ -9,7 +9,7 @@ import Link from 'next/link'
 
 const PAGE_SIZE = 24
 
-const MAKES = ['All Makes', 'BMW', 'Mercedes-Benz', 'Porsche', 'Toyota', 'Dodge', 'Chevrolet', 'Ford', 'Honda', 'Tesla', 'Audi', 'Other']
+const MAKES = ['All Makes', 'Acura', 'Alfa Romeo', 'Aston Martin', 'Audi', 'Bentley', 'BMW', 'Bugatti', 'Buick', 'Cadillac', 'Chevrolet', 'Chrysler', 'Dodge', 'Ferrari', 'Fiat', 'Ford', 'GMC', 'Honda', 'Hyundai', 'Infiniti', 'Jaguar', 'Jeep', 'Kia', 'Lamborghini', 'Land Rover', 'Lexus', 'Lincoln', 'Lotus', 'Maserati', 'Mazda', 'McLaren', 'Mercedes-Benz', 'MINI', 'Mitsubishi', 'Nissan', 'Porsche', 'Ram', 'Rolls-Royce', 'Subaru', 'Tesla', 'Toyota', 'Volkswagen', 'Volvo', 'Other']
 const PRICE_RANGES = [
   { label: 'Any Price', min: 0, max: undefined as number | undefined },
   { label: 'Under $20k', min: 0, max: 20000 },
