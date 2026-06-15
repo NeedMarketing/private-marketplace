@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Navbar from '@/components/Navbar'
 import { useAuth } from '@/context/AuthContext'
 import { createClient } from '@/lib/supabase/client'
+import { enablePush, pushStatus } from '@/lib/push'
 import { timeAgo } from '@/lib/utils'
 import type { Conversation } from '@/lib/types'
 
@@ -14,10 +15,24 @@ export default function MessagesPage() {
   const router = useRouter()
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [fetching, setFetching] = useState(true)
+  const [notifState, setNotifState] = useState<'unsupported' | 'denied' | 'granted' | 'default'>('default')
+  const [enabling, setEnabling] = useState(false)
 
   useEffect(() => {
     if (!loading && !user) router.push('/auth/login?next=/messages')
   }, [user, loading, router])
+
+  useEffect(() => { pushStatus().then(setNotifState) }, [])
+
+  const handleEnableNotifications = async () => {
+    if (!user) return
+    setEnabling(true)
+    const { ok, error } = await enablePush(user.id)
+    setEnabling(false)
+    if (ok) setNotifState('granted')
+    else if (error) alert(error)
+    else setNotifState(await pushStatus())
+  }
 
   const [otherNames, setOtherNames] = useState<Record<string, string>>({})
 
@@ -56,9 +71,26 @@ export default function MessagesPage() {
       <Navbar />
 
       <div className="max-w-3xl mx-auto px-5 py-10">
-        <div className="mb-8">
-          <h1 className="text-[28px] font-bold text-[#111111] tracking-tight">Messages</h1>
-          <p className="text-[14px] text-[#6B6B6B] mt-1">{fetching ? 'Loading…' : `${conversations.length} conversation${conversations.length !== 1 ? 's' : ''}`}</p>
+        <div className="mb-8 flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-[28px] font-bold text-[#111111] tracking-tight">Messages</h1>
+            <p className="text-[14px] text-[#6B6B6B] mt-1">{fetching ? 'Loading…' : `${conversations.length} conversation${conversations.length !== 1 ? 's' : ''}`}</p>
+          </div>
+          {notifState === 'default' && (
+            <button onClick={handleEnableNotifications} disabled={enabling} className="flex items-center gap-2 bg-white border border-[#E5E5E5] text-[#111111] text-[13px] font-semibold px-4 py-2.5 rounded-full hover:border-[#111111] transition-colors disabled:opacity-50">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+              {enabling ? 'Enabling…' : 'Enable notifications'}
+            </button>
+          )}
+          {notifState === 'granted' && (
+            <span className="flex items-center gap-1.5 text-[12px] font-medium text-emerald-700 bg-emerald-50 px-3 py-2 rounded-full">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+              Notifications on
+            </span>
+          )}
+          {notifState === 'denied' && (
+            <span className="text-[12px] text-[#6B6B6B] bg-[#F5F5F3] px-3 py-2 rounded-full">Notifications blocked in browser settings</span>
+          )}
         </div>
 
         {fetching ? (

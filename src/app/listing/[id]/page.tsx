@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Navbar from '@/components/Navbar'
 import { useAuth } from '@/context/AuthContext'
 import { createClient } from '@/lib/supabase/client'
+import { notifyNewMessage } from '@/lib/push'
 import { formatPrice, formatMileage, storageImage } from '@/lib/utils'
 import type { Listing } from '@/lib/types'
 
@@ -134,6 +135,9 @@ export default function ListingPage({ params }: { params: { id: string } }) {
         .from('conversations')
         .update({ last_message: introText, last_message_at: new Date().toISOString() })
         .eq('id', conv.id)
+
+      // Notify the seller via push (fire-and-forget).
+      notifyNewMessage(conv.id, user.id)
 
       router.push(`/messages/${conv.id}`)
     } catch (e) {

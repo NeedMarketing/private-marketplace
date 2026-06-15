@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import Navbar from '@/components/Navbar'
 import { useAuth } from '@/context/AuthContext'
 import { createClient } from '@/lib/supabase/client'
+import { notifyNewMessage } from '@/lib/push'
 import { formatPrice, timeAgo } from '@/lib/utils'
 import type { Conversation, Message, Listing } from '@/lib/types'
 
@@ -148,6 +149,9 @@ export default function ThreadPage({ params }: { params: { id: string } }) {
 
     // Optimistically append (dedup against the realtime echo by id).
     setMessages((prev) => prev.some((m) => m.id === inserted.id) ? prev : [...prev, inserted as Message])
+
+    // Notify the other participant via push (fire-and-forget).
+    notifyNewMessage(conversation.id, user.id)
 
     // Update conversation preview; non-fatal if it fails.
     const { error: updErr } = await supabase
