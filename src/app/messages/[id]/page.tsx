@@ -13,10 +13,12 @@ export default function ThreadPage({ params }: { params: { id: string } }) {
   const { user, profile, loading } = useAuth()
   const router = useRouter()
   const [conversation, setConversation] = useState<Conversation | null>(null)
+  const [otherName, setOtherName] = useState('')
   const [listing, setListing] = useState<Listing | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
+  const [sendError, setSendError] = useState('')
   const [notFound, setNotFound] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -29,32 +31,48 @@ export default function ThreadPage({ params }: { params: { id: string } }) {
     if (!user) return
     const supabase = createClient()
 
-    // Load conversation + messages in parallel
-    Promise.all([
-      supabase
-        .from('conversations')
-        .select('*, buyer:buyer_id(full_name), seller:seller_id(full_name)')
-        .eq('id', params.id)
-        .single(),
-      supabase
-        .from('messages')
-        .select('id, conversation_id, sender_id, sender_name, text, created_at')
-        .eq('conversation_id', params.id)
-        .order('created_at', { ascending: true }),
-    ]).then(([{ data: conv }, { data: msgs }]) => {
+    const load = async () => {
+      // Conversation + messages in parallel. No profile embed (so a missing FK
+      // can't error the query); maybeSingle so a missing row returns null cleanly.
+      const [{ data: conv, error: convErr }, { data: msgs }] = await Promise.all([
+        supabase
+          .from('conversations')
+          .select('id, listing_id, buyer_id, seller_id, listing_title, listing_image, last_message, last_message_at, created_at')
+          .eq('id', params.id)
+          .maybeSingle(),
+        supabase
+          .from('messages')
+          .select('id, conversation_id, sender_id, sender_name, text, created_at')
+          .eq('conversation_id', params.id)
+          .order('created_at', { ascending: true }),
+      ])
+
+      if (convErr) { console.error('Conversation fetch failed:', convErr); setNotFound(true); return }
       if (!conv) { setNotFound(true); return }
+      // Authorization is also enforced by RLS; this is a friendly client guard.
       if (conv.buyer_id !== user.id && conv.seller_id !== user.id) { router.push('/messages'); return }
+
       setConversation(conv)
       setMessages(msgs || [])
 
-      // Listing fetch only needs a few fields
+      // Resolve the OTHER participant's display name separately (no embed).
+      const otherId = conv.buyer_id === user.id ? conv.seller_id : conv.buyer_id
+      supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', otherId)
+        .maybeSingle()
+        .then(({ data: p }) => setOtherName(p?.full_name || 'Private Seller'))
+
+      // Listing context — maybeSingle so a sold/deleted listing doesn't throw.
       supabase
         .from('listings')
         .select('id, year, make, model, price, location, images')
         .eq('id', conv.listing_id)
-        .single()
+        .maybeSingle()
         .then(({ data: l }) => setListing(l as typeof l & Listing))
-    })
+    }
+    load()
 
     // Realtime subscription for new messages
     const channel = supabase
@@ -82,21 +100,42 @@ export default function ThreadPage({ params }: { params: { id: string } }) {
   const handleSend = async () => {
     if (!input.trim() || sending || !user || !conversation) return
     setSending(true)
+    setSendError('')
     const text = input.trim()
     setInput('')
     const supabase = createClient()
 
-    await supabase.from('messages').insert({
-      conversation_id: conversation.id,
-      sender_id: user.id,
-      sender_name: profile?.full_name || user.email || 'User',
-      text,
-    })
+    // Insert and read the row back so the sender sees their message immediately,
+    // independent of whether the realtime echo arrives. NEVER store email as the
+    // display name — fall back to a generic label.
+    const { data: inserted, error } = await supabase
+      .from('messages')
+      .insert({
+        conversation_id: conversation.id,
+        sender_id: user.id,
+        sender_name: profile?.full_name || 'User',
+        text,
+      })
+      .select('id, conversation_id, sender_id, sender_name, text, created_at')
+      .single()
 
-    await supabase
+    if (error || !inserted) {
+      console.error('Send failed:', error)
+      setSendError(error?.message || 'Message could not be sent. Please try again.')
+      setInput(text) // restore so the user doesn't lose their text
+      setSending(false)
+      return
+    }
+
+    // Optimistically append (dedup against the realtime echo by id).
+    setMessages((prev) => prev.some((m) => m.id === inserted.id) ? prev : [...prev, inserted as Message])
+
+    // Update conversation preview; non-fatal if it fails.
+    const { error: updErr } = await supabase
       .from('conversations')
       .update({ last_message: text, last_message_at: new Date().toISOString() })
       .eq('id', conversation.id)
+    if (updErr) console.error('Conversation preview update failed:', updErr)
 
     setSending(false)
     inputRef.current?.focus()
@@ -118,11 +157,6 @@ export default function ThreadPage({ params }: { params: { id: string } }) {
       </div>
     )
   }
-
-  const isBuyer = conversation?.buyer_id === user.id
-  const otherName = isBuyer
-    ? (conversation?.seller as unknown as { full_name: string } | undefined)?.full_name
-    : (conversation?.buyer as unknown as { full_name: string } | undefined)?.full_name
 
   // Group messages by date
   const groups: { date: string; messages: Message[] }[] = []
@@ -211,6 +245,7 @@ export default function ThreadPage({ params }: { params: { id: string } }) {
       {/* Input */}
       <div className="bg-white border-t border-[#E5E5E5] sticky bottom-0">
         <div className="max-w-3xl mx-auto px-5 py-3">
+          {sendError && <p className="text-[12px] text-red-600 mb-2 text-center">{sendError}</p>}
           <div className="flex items-end gap-3">
             <div className="flex-1 bg-[#F5F5F3] rounded-2xl px-4 py-3 flex items-end gap-2">
               <textarea

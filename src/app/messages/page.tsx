@@ -19,18 +19,34 @@ export default function MessagesPage() {
     if (!loading && !user) router.push('/auth/login?next=/messages')
   }, [user, loading, router])
 
+  const [otherNames, setOtherNames] = useState<Record<string, string>>({})
+
   useEffect(() => {
     if (!user) return
     const supabase = createClient()
-    supabase
-      .from('conversations')
-      .select('*, buyer:buyer_id(full_name), seller:seller_id(full_name)')
-      .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
-      .order('last_message_at', { ascending: false })
-      .then(({ data }) => {
-        setConversations((data || []) as unknown as Conversation[])
-        setFetching(false)
-      })
+    const load = async () => {
+      // No profile embed (resilient to a missing FK); resolve names separately.
+      const { data, error } = await supabase
+        .from('conversations')
+        .select('id, listing_id, buyer_id, seller_id, listing_title, listing_image, last_message, last_message_at, created_at')
+        .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
+        .order('last_message_at', { ascending: false })
+
+      if (error) { console.error('Conversations fetch failed:', error); setFetching(false); return }
+      const convs = (data || []) as unknown as Conversation[]
+      setConversations(convs)
+      setFetching(false)
+
+      // For each conversation the "other party" is whichever id isn't me.
+      const otherIds = Array.from(new Set(convs.map((c) => c.buyer_id === user.id ? c.seller_id : c.buyer_id)))
+      if (otherIds.length > 0) {
+        const { data: profs } = await supabase.from('profiles').select('id, full_name').in('id', otherIds)
+        const map: Record<string, string> = {}
+        ;(profs || []).forEach((p) => { map[p.id] = p.full_name || 'Private Seller' })
+        setOtherNames(map)
+      }
+    }
+    load()
   }, [user])
 
   if (loading || !user) return <div className="min-h-screen bg-[#FAFAF7] flex items-center justify-center"><div className="w-6 h-6 border-2 border-[#111111] border-t-transparent rounded-full animate-spin" /></div>
@@ -61,10 +77,8 @@ export default function MessagesPage() {
         ) : (
           <div className="flex flex-col gap-2">
             {conversations.map((c) => {
-              const isBuyer = c.buyer_id === user.id
-              const other = isBuyer
-                ? (c.seller as unknown as { full_name: string } | undefined)?.full_name
-                : (c.buyer as unknown as { full_name: string } | undefined)?.full_name
+              const otherId = c.buyer_id === user.id ? c.seller_id : c.buyer_id
+              const other = otherNames[otherId]
 
               return (
                 <Link key={c.id} href={`/messages/${c.id}`} className="bg-white border border-[#E5E5E5] rounded-2xl p-4 flex items-center gap-4 hover:shadow-[0_4px_20px_rgba(0,0,0,0.08)] hover:border-transparent transition-all group">

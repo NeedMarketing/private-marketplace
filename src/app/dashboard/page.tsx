@@ -127,6 +127,7 @@ export default function DashboardPage() {
   const [profileForm, setProfileForm] = useState({ full_name: '', phone: '' })
   const [profileSaved, setProfileSaved] = useState(false)
   const [fetching, setFetching] = useState(true)
+  const [otherNames, setOtherNames] = useState<Record<string, string>>({})
 
   useEffect(() => {
     if (!loading && !user) router.push('/auth/login')
@@ -139,14 +140,26 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!user) return
     const supabase = createClient()
-    Promise.all([
-      supabase.from('listings').select('id, seller_id, year, make, model, trim, price, mileage, location, condition, title_status, color, interior_color, transmission, fuel_type, vin, description, images, contact_preference, status, created_at, updated_at').eq('seller_id', user.id).order('created_at', { ascending: false }),
-      supabase.from('conversations').select('id, listing_id, buyer_id, seller_id, listing_title, listing_image, last_message, last_message_at, buyer:buyer_id(full_name), seller:seller_id(full_name)').or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`).order('last_message_at', { ascending: false }),
-    ]).then(([{ data: listings }, { data: convs }]) => {
+    const load = async () => {
+      const [{ data: listings }, { data: convs }] = await Promise.all([
+        supabase.from('listings').select('id, seller_id, year, make, model, trim, price, mileage, location, condition, title_status, color, interior_color, transmission, fuel_type, vin, description, images, contact_preference, status, created_at, updated_at').eq('seller_id', user.id).order('created_at', { ascending: false }),
+        // No profile embed — resilient to a missing FK; names resolved separately.
+        supabase.from('conversations').select('id, listing_id, buyer_id, seller_id, listing_title, listing_image, last_message, last_message_at, created_at').or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`).order('last_message_at', { ascending: false }),
+      ])
       setMyListings(listings || [])
-      setConversations((convs || []) as unknown as Conversation[])
+      const convList = (convs || []) as unknown as Conversation[]
+      setConversations(convList)
       setFetching(false)
-    })
+
+      const otherIds = Array.from(new Set(convList.map((c) => c.buyer_id === user.id ? c.seller_id : c.buyer_id)))
+      if (otherIds.length > 0) {
+        const { data: profs } = await supabase.from('profiles').select('id, full_name').in('id', otherIds)
+        const map: Record<string, string> = {}
+        ;(profs || []).forEach((p) => { map[p.id] = p.full_name || 'Private Seller' })
+        setOtherNames(map)
+      }
+    }
+    load()
   }, [user])
 
   if (loading || !user) return <div className="min-h-screen bg-[#FAFAF7] flex items-center justify-center"><div className="w-6 h-6 border-2 border-[#111111] border-t-transparent rounded-full animate-spin" /></div>
@@ -203,7 +216,7 @@ export default function DashboardPage() {
         <div className="flex items-start justify-between mb-8 flex-wrap gap-4">
           <div>
             <h1 className="text-[28px] font-bold text-[#111111] tracking-tight">Hey, {firstName || 'there'}.</h1>
-            <p className="text-[14px] text-[#6B6B6B] mt-1">{user.email} · {profile?.user_type === 'buyer' ? 'Buyer' : profile?.user_type === 'seller' ? 'Seller' : 'Buyer & Seller'}</p>
+            <p className="text-[14px] text-[#6B6B6B] mt-1">{user.email}</p>
           </div>
           <Link href="/sell" className="bg-[#111111] text-white text-[13px] font-semibold px-5 py-2.5 rounded-full hover:bg-[#333] transition-colors flex items-center gap-2">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -269,10 +282,8 @@ export default function DashboardPage() {
             ) : (
               <div className="flex flex-col gap-3">
                 {conversations.map((c) => {
-                  const isBuyer = c.buyer_id === user.id
-                  const otherParty = isBuyer
-                    ? (c.seller as unknown as { full_name: string } | undefined)?.full_name
-                    : (c.buyer as unknown as { full_name: string } | undefined)?.full_name
+                  const otherId = c.buyer_id === user.id ? c.seller_id : c.buyer_id
+                  const otherParty = otherNames[otherId]
                   return (
                     <Link key={c.id} href={`/messages/${c.id}`} className="bg-white border border-[#E5E5E5] rounded-2xl p-4 flex items-center gap-4 hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)] transition-all">
                       <div className="w-12 h-12 rounded-xl overflow-hidden bg-[#F5F5F3] shrink-0">

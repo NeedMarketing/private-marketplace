@@ -10,7 +10,7 @@ type AuthCtx = {
   profile: Profile | null
   loading: boolean
   login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>
-  signup: (data: { fullName: string; email: string; phone: string; password: string; userType: string }) => Promise<{ ok: boolean; error?: string }>
+  signup: (data: { fullName: string; email: string; phone: string; password: string }) => Promise<{ ok: boolean; error?: string }>
   logout: () => Promise<void>
   updateProfile: (data: Partial<Pick<Profile, 'full_name' | 'phone'>>) => Promise<void>
 }
@@ -71,11 +71,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { ok: true }
   }
 
-  const signup = async ({ fullName, email, phone, password, userType }: { fullName: string; email: string; phone: string; password: string; userType: string }) => {
+  const signup = async ({ fullName, email, phone, password }: { fullName: string; email: string; phone: string; password: string }) => {
     const { error } = await createClient().auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName, phone, user_type: userType } },
+      // Every account can both buy and sell; user_type defaults to 'both' in the DB.
+      options: { data: { full_name: fullName, phone, user_type: 'both' } },
     })
     if (error) return { ok: false, error: error.message }
     return { ok: true }

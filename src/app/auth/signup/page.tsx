@@ -7,13 +7,11 @@ import { useAuth } from '@/context/AuthContext'
 
 const inp = "w-full border border-[#E5E5E5] rounded-xl px-4 py-3 text-[14px] text-[#111111] placeholder:text-[#6B6B6B] outline-none focus:border-[#111111] transition-colors bg-white"
 
-type UserType = 'buyer' | 'seller' | 'both'
-
 export default function SignupPage() {
   const { signup } = useAuth()
   const router = useRouter()
 
-  const [form, setForm] = useState({ fullName: '', email: '', phone: '', password: '', userType: 'both' as UserType })
+  const [form, setForm] = useState({ fullName: '', email: '', phone: '', password: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [showPw, setShowPw] = useState(false)
@@ -34,7 +32,6 @@ export default function SignupPage() {
       email: form.email.trim().toLowerCase(),
       phone: form.phone.trim(),
       password: form.password,
-      userType: form.userType,
     })
     setLoading(false)
     if (!ok) return setError(err || 'Something went wrong.')
@@ -94,18 +91,6 @@ export default function SignupPage() {
                 <button type="button" onClick={() => setShowPw(!showPw)} className="absolute right-4 top-1/2 -translate-y-1/2 text-[#6B6B6B] hover:text-[#111111] transition-colors text-[12px] font-medium">
                   {showPw ? 'Hide' : 'Show'}
                 </button>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-[13px] font-semibold text-[#111111] mb-2">I want to…</label>
-              <div className="grid grid-cols-3 gap-2">
-                {([['buyer', 'Buy a car'], ['seller', 'Sell a car'], ['both', 'Buy & sell']] as [UserType, string][]).map(([val, label]) => (
-                  <button key={val} type="button" onClick={() => set('userType', val)}
-                    className={`py-3 px-2 rounded-xl text-[13px] font-medium border transition-all text-center ${form.userType === val ? 'bg-[#111111] text-white border-[#111111]' : 'bg-white text-[#111111] border-[#E5E5E5] hover:border-[#111111]'}`}>
-                    {label}
-                  </button>
-                ))}
               </div>
             </div>
 
