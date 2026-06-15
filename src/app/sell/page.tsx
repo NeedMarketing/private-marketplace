@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Navbar from '@/components/Navbar'
+import ImageCropper from '@/components/ImageCropper'
 import { useAuth } from '@/context/AuthContext'
 import { createClient } from '@/lib/supabase/client'
 import { formatPrice } from '@/lib/utils'
@@ -52,6 +53,7 @@ export default function SellPage() {
   const [step, setStep] = useState(0)
   const [form, setForm] = useState<FormState>(EMPTY)
   const [imageFiles, setImageFiles] = useState<{ preview: string; file: File }[]>([])
+  const [cropQueue, setCropQueue] = useState<File[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [publishedId, setPublishedId] = useState('')
   const [error, setError] = useState('')
@@ -64,10 +66,19 @@ export default function SellPage() {
   const set = (k: keyof FormState, v: unknown) => setForm((f) => ({ ...f, [k]: v }))
 
   const addImages = (files: FileList) => {
-    const added = Array.from(files).slice(0, 8 - imageFiles.length)
-    const newPreviews = added.map((f) => ({ preview: URL.createObjectURL(f), file: f }))
-    setImageFiles((prev) => [...prev, ...newPreviews])
+    // Queue selected images for cropping (max 8 total across existing + queued).
+    const room = 8 - imageFiles.length - cropQueue.length
+    if (room <= 0) return
+    const added = Array.from(files).filter((f) => f.type.startsWith('image/')).slice(0, room)
+    setCropQueue((prev) => [...prev, ...added])
   }
+
+  // Cropper produced a framed 4:3 image — store it and move to the next in the queue.
+  const handleCropDone = (cropped: File) => {
+    setImageFiles((prev) => [...prev, { preview: URL.createObjectURL(cropped), file: cropped }])
+    setCropQueue((prev) => prev.slice(1))
+  }
+  const handleCropSkip = () => setCropQueue((prev) => prev.slice(1))
 
   const removeImage = (i: number) => {
     URL.revokeObjectURL(imageFiles[i].preview)
@@ -180,6 +191,19 @@ export default function SellPage() {
   return (
     <div className="min-h-screen bg-[#FAFAF7]">
       <Navbar />
+
+      {/* Crop each newly-added photo to 4:3 so it displays perfectly everywhere */}
+      {cropQueue.length > 0 && (
+        <ImageCropper
+          key={cropQueue.length}
+          file={cropQueue[0]}
+          index={imageFiles.length}
+          total={imageFiles.length + cropQueue.length}
+          aspect={4 / 3}
+          onDone={handleCropDone}
+          onCancel={handleCropSkip}
+        />
+      )}
 
       <div className="max-w-2xl mx-auto px-5 py-10">
         {/* Progress */}

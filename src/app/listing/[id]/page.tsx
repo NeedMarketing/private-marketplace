@@ -185,7 +185,7 @@ export default function ListingPage({ params }: { params: { id: string } }) {
                 always fits, any orientation, never cropped or zoomed. The side/letterbox
                 space is filled with a soft blurred copy of the same photo. */}
             <div
-              className="relative rounded-2xl overflow-hidden shadow-[0_2px_20px_rgba(0,0,0,0.08)] mb-3 w-full h-[clamp(360px,60vh,600px)] select-none"
+              className="relative rounded-2xl overflow-hidden shadow-[0_2px_20px_rgba(0,0,0,0.08)] mb-3 w-full aspect-[4/3] max-h-[620px] select-none"
               onTouchStart={(e) => { touchStartX.current = e.touches[0].clientX }}
               onTouchEnd={(e) => {
                 if (touchStartX.current === null || listing.images.length < 2) return
