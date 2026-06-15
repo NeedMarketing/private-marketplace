@@ -90,7 +90,26 @@ export default function ThreadPage({ params }: { params: { id: string } }) {
       })
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    // Polling fallback: refetch every 4s so new messages still arrive even if
+    // Realtime isn't enabled for this table. Deduped by id, so it never doubles
+    // up with the realtime/optimistic paths.
+    const poll = setInterval(async () => {
+      const { data: fresh } = await supabase
+        .from('messages')
+        .select('id, conversation_id, sender_id, sender_name, text, created_at')
+        .eq('conversation_id', params.id)
+        .order('created_at', { ascending: true })
+      if (fresh) {
+        setMessages((prev) => {
+          if (fresh.length === prev.length && fresh[fresh.length - 1]?.id === prev[prev.length - 1]?.id) return prev
+          const byId = new Map(prev.map((m) => [m.id, m]))
+          ;(fresh as Message[]).forEach((m) => byId.set(m.id, m))
+          return Array.from(byId.values()).sort((a, b) => a.created_at.localeCompare(b.created_at))
+        })
+      }
+    }, 4000)
+
+    return () => { supabase.removeChannel(channel); clearInterval(poll) }
   }, [params.id, user, router, loading])
 
   useEffect(() => {

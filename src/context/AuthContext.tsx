@@ -35,9 +35,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Profile fetch is intentionally NOT awaited on the critical path — pages only
     // need user.id to start loading their data. Blocking `loading` on this extra
     // round-trip is what made gated pages slow.
-    const fetchProfile = (userId: string) => {
-      supabase.from('profiles').select('id, full_name, phone, user_type, created_at, updated_at').eq('id', userId).single()
-        .then(({ data }) => setProfile(data))
+    // Ensure a profiles row ALWAYS exists for the logged-in user. Conversations
+    // and messages reference profiles(id); a missing row (e.g. signup before the
+    // DB trigger existed) causes message/conversation inserts to fail. We self-heal
+    // it here so messaging can never break for that reason. maybeSingle() avoids
+    // throwing when the row is absent.
+    const fetchProfile = async (u: { id: string; email?: string; user_metadata?: Record<string, unknown> }) => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, full_name, phone, user_type, created_at, updated_at')
+        .eq('id', u.id)
+        .maybeSingle()
+
+      if (data) { setProfile(data); return }
+
+      // No profile yet — create one from the auth metadata captured at signup.
+      const meta = u.user_metadata || {}
+      const { data: created } = await supabase
+        .from('profiles')
+        .upsert({
+          id: u.id,
+          full_name: (meta.full_name as string) || '',
+          phone: (meta.phone as string) || '',
+          user_type: 'both',
+        })
+        .select('id, full_name, phone, user_type, created_at, updated_at')
+        .maybeSingle()
+      setProfile(created)
     }
 
     // getSession() reads the session from local storage / cookie (no network),
@@ -45,7 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user)
-        fetchProfile(session.user.id)
+        fetchProfile(session.user)
       }
       setLoading(false)
     })
@@ -53,7 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         setUser(session.user)
-        fetchProfile(session.user.id)
+        fetchProfile(session.user)
       } else {
         setUser(null)
         setProfile(null)
