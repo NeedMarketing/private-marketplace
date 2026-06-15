@@ -42,7 +42,7 @@ export type Conversation = {
   listing_image: string
   last_message: string
   last_message_at: string
-  created_at: string
+  created_at?: string
   buyer?: { full_name: string }
   seller?: { full_name: string }
 }

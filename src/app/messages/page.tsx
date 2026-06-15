@@ -28,7 +28,7 @@ export default function MessagesPage() {
       .or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`)
       .order('last_message_at', { ascending: false })
       .then(({ data }) => {
-        setConversations(data || [])
+        setConversations((data || []) as unknown as Conversation[])
         setFetching(false)
       })
   }, [user])

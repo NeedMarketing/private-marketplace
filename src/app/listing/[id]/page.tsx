@@ -324,7 +324,8 @@ export default function ListingPage({ params }: { params: { id: string } }) {
 }
 
 function SimilarListings({ currentId, make }: { currentId: string; make: string }) {
-  const [listings, setListings] = useState<Listing[]>([])
+  type SimilarListing = Pick<Listing, 'id' | 'year' | 'make' | 'model' | 'price' | 'mileage' | 'location' | 'images'>
+  const [listings, setListings] = useState<SimilarListing[]>([])
 
   useEffect(() => {
     const supabase = createClient()

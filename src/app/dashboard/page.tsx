@@ -144,7 +144,7 @@ export default function DashboardPage() {
       supabase.from('conversations').select('id, listing_id, buyer_id, seller_id, listing_title, listing_image, last_message, last_message_at, buyer:buyer_id(full_name), seller:seller_id(full_name)').or(`buyer_id.eq.${user.id},seller_id.eq.${user.id}`).order('last_message_at', { ascending: false }),
     ]).then(([{ data: listings }, { data: convs }]) => {
       setMyListings(listings || [])
-      setConversations(convs || [])
+      setConversations((convs || []) as unknown as Conversation[])
       setFetching(false)
     })
   }, [user])

@@ -81,7 +81,8 @@ const sellerSteps = [
 
 export default function HomePage() {
   const { user, profile } = useAuth()
-  const [featured, setFeatured] = useState<Listing[]>([])
+  type FeaturedListing = Pick<Listing, 'id' | 'year' | 'make' | 'model' | 'trim' | 'price' | 'mileage' | 'location' | 'images' | 'created_at'>
+  const [featured, setFeatured] = useState<FeaturedListing[]>([])
 
   useEffect(() => {
     const supabase = createClient()
