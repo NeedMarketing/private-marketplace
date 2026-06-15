@@ -18,58 +18,147 @@ function ConditionDot({ c }: { c: string }) {
   return <span className={`inline-block w-2 h-2 rounded-full ${map[c] || 'bg-gray-400'}`} />
 }
 
+const MAKES = ['Acura','Alfa Romeo','Aston Martin','Audi','Bentley','BMW','Bugatti','Buick','Cadillac','Chevrolet','Chrysler','Dodge','Ferrari','Fiat','Ford','GMC','Honda','Hyundai','Infiniti','Jaguar','Jeep','Kia','Lamborghini','Land Rover','Lexus','Lincoln','Lotus','Maserati','Mazda','McLaren','Mercedes-Benz','MINI','Mitsubishi','Nissan','Porsche','Ram','Rolls-Royce','Subaru','Tesla','Toyota','Volkswagen','Volvo','Other']
+const COLORS = ['Black','White','Silver','Gray','Red','Blue','Green','Brown','Yellow','Orange','Purple','Gold','Beige','Other']
+const TRANSMISSIONS = ['Automatic','Manual','CVT','Semi-Automatic']
+const FUELS = ['Gas','Diesel','Hybrid','Plug-in Hybrid','Electric','Other']
+const TITLES = ['Clean title','Rebuilt/Salvage','Lien on title','No title','Missing']
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-[12px] font-semibold text-[#111111] mb-1.5">{label}</label>
+      {children}
+    </div>
+  )
+}
+
 function EditModal({ listing, onSave, onClose }: { listing: Listing; onSave: (l: Listing) => void; onClose: () => void }) {
-  const [form, setForm] = useState({ price: String(listing.price), mileage: String(listing.mileage), description: listing.description, condition: listing.condition })
+  const [form, setForm] = useState({
+    year: String(listing.year),
+    make: listing.make,
+    model: listing.model,
+    trim: listing.trim || '',
+    mileage: String(listing.mileage),
+    vin: listing.vin || '',
+    price: String(listing.price),
+    location: listing.location || '',
+    condition: listing.condition,
+    title_status: listing.title_status || 'Clean title',
+    color: listing.color || '',
+    interior_color: listing.interior_color || '',
+    transmission: listing.transmission || 'Automatic',
+    fuel_type: listing.fuel_type || 'Gas',
+    description: listing.description || '',
+    contact_preference: listing.contact_preference || 'message',
+    status: listing.status,
+  })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }))
 
   const handleSave = async () => {
+    setSaving(true)
+    setError('')
     const supabase = createClient()
-    const { data } = await supabase
+    const { data, error: err } = await supabase
       .from('listings')
-      .update({ price: Number(form.price), mileage: Number(form.mileage), description: form.description, condition: form.condition })
+      .update({
+        year: Number(form.year),
+        make: form.make,
+        model: form.model,
+        trim: form.trim,
+        mileage: Number(form.mileage),
+        vin: form.vin,
+        price: Number(form.price),
+        location: form.location,
+        condition: form.condition,
+        title_status: form.title_status,
+        color: form.color,
+        interior_color: form.interior_color,
+        transmission: form.transmission,
+        fuel_type: form.fuel_type,
+        description: form.description,
+        contact_preference: form.contact_preference,
+        status: form.status,
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', listing.id)
       .select('id, seller_id, year, make, model, trim, price, mileage, location, condition, title_status, color, interior_color, transmission, fuel_type, vin, description, images, contact_preference, status, created_at, updated_at')
       .single()
+    if (err) { console.error('Edit save failed:', err); setError(err.message || 'Could not save changes. Please try again.'); setSaving(false); return }
     if (data) onSave(data)
     onClose()
   }
 
+  const selCls = inp + " appearance-none cursor-pointer"
+
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-[0_24px_64px_rgba(0,0,0,0.18)] w-full max-w-md">
-        <div className="flex items-center justify-between p-6 border-b border-[#E5E5E5]">
+      <div className="bg-white rounded-2xl shadow-[0_24px_64px_rgba(0,0,0,0.18)] w-full max-w-lg max-h-[88vh] flex flex-col">
+        <div className="flex items-center justify-between p-5 border-b border-[#E5E5E5] shrink-0">
           <h3 className="text-[16px] font-semibold text-[#111111]">Edit listing</h3>
           <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-[#F5F5F3] flex items-center justify-center transition-colors">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6B6B6B" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
-        <div className="p-6 flex flex-col gap-4">
+
+        <div className="p-5 flex flex-col gap-4 overflow-y-auto">
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[12px] font-semibold text-[#111111] mb-1.5">Asking price</label>
-              <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-[14px] text-[#6B6B6B]">$</span><input value={form.price} onChange={(e) => set('price', e.target.value)} type="number" className={inp + ' pl-7'} /></div>
-            </div>
-            <div>
-              <label className="block text-[12px] font-semibold text-[#111111] mb-1.5">Mileage</label>
-              <input value={form.mileage} onChange={(e) => set('mileage', e.target.value)} type="number" className={inp} />
-            </div>
+            <Field label="Year"><input value={form.year} onChange={(e) => set('year', e.target.value)} type="number" min="1900" max="2026" className={inp} /></Field>
+            <Field label="Make">
+              <select value={form.make} onChange={(e) => set('make', e.target.value)} className={selCls}>
+                {!MAKES.includes(form.make) && form.make && <option>{form.make}</option>}
+                {MAKES.map((m) => <option key={m}>{m}</option>)}
+              </select>
+            </Field>
           </div>
-          <div>
-            <label className="block text-[12px] font-semibold text-[#111111] mb-1.5">Condition</label>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Model"><input value={form.model} onChange={(e) => set('model', e.target.value)} className={inp} /></Field>
+            <Field label="Trim / Package"><input value={form.trim} onChange={(e) => set('trim', e.target.value)} className={inp} /></Field>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Asking price">
+              <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-[14px] text-[#6B6B6B]">$</span><input value={form.price} onChange={(e) => set('price', e.target.value)} type="number" className={inp + ' pl-7'} /></div>
+            </Field>
+            <Field label="Mileage"><input value={form.mileage} onChange={(e) => set('mileage', e.target.value)} type="number" className={inp} /></Field>
+          </div>
+          <Field label="Location"><input value={form.location} onChange={(e) => set('location', e.target.value)} placeholder="e.g. Los Angeles, CA" className={inp} /></Field>
+          <Field label="VIN"><input value={form.vin} onChange={(e) => set('vin', e.target.value.toUpperCase())} maxLength={17} className={inp + ' font-mono text-[13px]'} /></Field>
+
+          <Field label="Condition">
             <div className="grid grid-cols-4 gap-1.5">
               {(['Like New', 'Excellent', 'Good', 'Fair'] as Listing['condition'][]).map((c) => (
                 <button key={c} onClick={() => set('condition', c)} className={`py-2 text-[12px] font-medium rounded-lg border transition-all ${form.condition === c ? 'bg-[#111111] text-white border-[#111111]' : 'bg-white text-[#111111] border-[#E5E5E5] hover:border-[#111111]'}`}>{c}</button>
               ))}
             </div>
+          </Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Transmission"><select value={form.transmission} onChange={(e) => set('transmission', e.target.value)} className={selCls}>{TRANSMISSIONS.map((t) => <option key={t}>{t}</option>)}</select></Field>
+            <Field label="Fuel type"><select value={form.fuel_type} onChange={(e) => set('fuel_type', e.target.value)} className={selCls}>{FUELS.map((f) => <option key={f}>{f}</option>)}</select></Field>
           </div>
-          <div>
-            <label className="block text-[12px] font-semibold text-[#111111] mb-1.5">Description</label>
-            <textarea value={form.description} onChange={(e) => set('description', e.target.value)} rows={3} className={inp + ' resize-none'} />
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Exterior color"><select value={form.color} onChange={(e) => set('color', e.target.value)} className={selCls}><option value="">Select color</option>{COLORS.map((c) => <option key={c}>{c}</option>)}</select></Field>
+            <Field label="Interior color"><select value={form.interior_color} onChange={(e) => set('interior_color', e.target.value)} className={selCls}><option value="">Select color</option>{COLORS.map((c) => <option key={c}>{c}</option>)}</select></Field>
           </div>
-          <div className="flex gap-3 pt-2">
-            <button onClick={onClose} className="flex-1 py-3 rounded-xl border border-[#E5E5E5] text-[14px] font-medium text-[#6B6B6B] hover:border-[#111111] transition-colors">Cancel</button>
-            <button onClick={handleSave} className="flex-1 py-3 rounded-xl bg-[#111111] text-white text-[14px] font-semibold hover:bg-[#333] transition-colors">Save changes</button>
-          </div>
+          <Field label="Title status"><select value={form.title_status} onChange={(e) => set('title_status', e.target.value)} className={selCls}>{TITLES.map((t) => <option key={t}>{t}</option>)}</select></Field>
+
+          <Field label="Description"><textarea value={form.description} onChange={(e) => set('description', e.target.value)} rows={4} className={inp + ' resize-none'} /></Field>
+
+          <Field label="Status">
+            <div className="grid grid-cols-3 gap-1.5">
+              {(['active', 'sold', 'draft'] as Listing['status'][]).map((s) => (
+                <button key={s} onClick={() => set('status', s)} className={`py-2 text-[12px] font-medium rounded-lg border capitalize transition-all ${form.status === s ? 'bg-[#111111] text-white border-[#111111]' : 'bg-white text-[#111111] border-[#E5E5E5] hover:border-[#111111]'}`}>{s}</button>
+              ))}
+            </div>
+          </Field>
+
+          {error && <p className="text-[12px] text-red-600">{error}</p>}
+        </div>
+
+        <div className="flex gap-3 p-5 border-t border-[#E5E5E5] shrink-0">
+          <button onClick={onClose} className="flex-1 py-3 rounded-xl border border-[#E5E5E5] text-[14px] font-medium text-[#6B6B6B] hover:border-[#111111] transition-colors">Cancel</button>
+          <button onClick={handleSave} disabled={saving} className="flex-1 py-3 rounded-xl bg-[#111111] text-white text-[14px] font-semibold hover:bg-[#333] transition-colors disabled:opacity-50">{saving ? 'Saving…' : 'Save changes'}</button>
         </div>
       </div>
     </div>
@@ -101,7 +190,7 @@ function MyListingCard({ listing, onEdit, onDelete, onMarkSold }: { listing: Lis
             <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
             <div className="absolute right-0 top-10 bg-white border border-[#E5E5E5] rounded-xl shadow-[0_8px_24px_rgba(0,0,0,0.12)] w-44 py-1.5 z-20">
               <Link href={`/listing/${listing.id}`} onClick={() => setMenuOpen(false)} className="block px-4 py-2.5 text-[13px] text-[#111111] hover:bg-[#F5F5F3]">View listing</Link>
-              {listing.status === 'active' && <button onClick={() => { setMenuOpen(false); onEdit() }} className="w-full text-left px-4 py-2.5 text-[13px] text-[#111111] hover:bg-[#F5F5F3]">Edit listing</button>}
+              <button onClick={() => { setMenuOpen(false); onEdit() }} className="w-full text-left px-4 py-2.5 text-[13px] text-[#111111] hover:bg-[#F5F5F3]">Edit listing</button>
               {listing.status === 'active' && <button onClick={() => { setMenuOpen(false); onMarkSold() }} className="w-full text-left px-4 py-2.5 text-[13px] text-[#111111] hover:bg-[#F5F5F3]">Mark as sold</button>}
               <button onClick={() => { setMenuOpen(false); onDelete() }} className="w-full text-left px-4 py-2.5 text-[13px] text-red-500 hover:bg-red-50">Delete listing</button>
             </div>
