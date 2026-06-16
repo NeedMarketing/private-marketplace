@@ -29,7 +29,7 @@ type FormState = {
   transmission: string
   fuel_type: string
   description: string
-  contact_preference: 'message' | 'phone' | 'both'
+  contact_preference: 'message' | 'email' | 'both'
 }
 
 const EMPTY: FormState = {
@@ -422,7 +422,7 @@ export default function SellPage() {
             <h2 className="text-[17px] font-semibold text-[#111111]">Contact preferences</h2>
             <p className="text-[13px] text-[#6B6B6B]">How would you like buyers to reach you?</p>
             <div className="flex flex-col gap-2">
-              {([['message', 'In-app messages only', 'Buyers contact you through private. messaging (recommended)'], ['phone', 'Phone calls only', 'Share your phone number with interested buyers'], ['both', 'Both message & phone', 'Buyers can message you or call directly']] as ['message' | 'phone' | 'both', string, string][]).map(([val, label, desc]) => (
+              {([['message', 'In-app messages only', 'Buyers contact you through private. messaging (recommended)'], ['email', 'Email only', 'Share your account email with interested buyers'], ['both', 'Both message & email', 'Buyers can message you in-app or email you directly']] as ['message' | 'email' | 'both', string, string][]).map(([val, label, desc]) => (
                 <button key={val} type="button" onClick={() => set('contact_preference', val)} className={`text-left p-4 rounded-xl border transition-all ${form.contact_preference === val ? 'border-[#111111] bg-[#F5F5F3]' : 'border-[#E5E5E5] hover:border-[#111111]'}`}>
                   <div className="flex items-center gap-3">
                     <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${form.contact_preference === val ? 'border-[#111111] bg-[#111111]' : 'border-[#E5E5E5]'}`}>

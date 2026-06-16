@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Navbar from '@/components/Navbar'
 import Comments from '@/components/Comments'
+import DealRating from '@/components/DealRating'
 import { useAuth } from '@/context/AuthContext'
 import { createClient } from '@/lib/supabase/client'
 import { notifyNewMessage } from '@/lib/push'
@@ -51,8 +52,11 @@ export default function ListingClient({ initialListing }: { initialListing: List
       if (error) { setLiked(false); setLikeCount((c) => Math.max(0, c - 1)); console.error(error) }
     }
   }
-  const sellerName = (listing.profiles as { full_name: string; phone: string } | undefined)?.full_name || 'Private Seller'
-  const sellerPhone = (listing.profiles as { full_name: string; phone: string } | undefined)?.phone || ''
+  const sellerProfile = listing.profiles as { full_name?: string; email?: string } | undefined
+  const sellerName = sellerProfile?.full_name || 'Private Seller'
+  const sellerEmail = sellerProfile?.email || ''
+  // Seller is reachable by email only if they opted into email contact.
+  const showEmail = (listing.contact_preference === 'email' || listing.contact_preference === 'both') && !!sellerEmail
 
   const handleMessage = async () => {
     if (!user) { router.push(`/auth/login?next=/listing/${listing.id}`); return }
@@ -300,7 +304,10 @@ export default function ListingClient({ initialListing }: { initialListing: List
               <div className="bg-white border border-[#E5E5E5] rounded-2xl p-6 shadow-[0_2px_20px_rgba(0,0,0,0.07)]">
                 <h1 className="text-[18px] font-bold text-[#111111] tracking-tight">{listing.year} {listing.make} {listing.model}</h1>
                 <p className="text-[13px] text-[#6B6B6B] mb-4">{listing.trim}</p>
-                <p className="text-[36px] font-bold text-[#111111] mb-1">{formatPrice(listing.price)}</p>
+                <p className="text-[36px] font-bold text-[#111111] mb-2">{formatPrice(listing.price)}</p>
+                <div className="mb-4">
+                  <DealRating id={listing.id} make={listing.make} model={listing.model} year={listing.year} price={listing.price} />
+                </div>
                 <p className="text-[13px] text-[#6B6B6B] mb-6 flex items-center gap-1">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                   {listing.location}
@@ -349,8 +356,8 @@ export default function ListingClient({ initialListing }: { initialListing: List
                   </div>
                   <div>
                     <p className="text-[14px] font-semibold text-[#111111]">{sellerName}</p>
-                    {listing.contact_preference !== 'message' && sellerPhone && (
-                      <p className="text-[12px] text-[#6B6B6B]">{sellerPhone}</p>
+                    {showEmail && (
+                      <a href={`mailto:${sellerEmail}`} className="text-[12px] text-[#111111] underline hover:text-[#333] break-all">{sellerEmail}</a>
                     )}
                   </div>
                 </div>

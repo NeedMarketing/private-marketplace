@@ -14,7 +14,7 @@ async function fetchListing(id: string): Promise<Listing | null> {
   const supabase = createClient()
   const { data } = await supabase.from('listings').select(LISTING_COLUMNS).eq('id', id).maybeSingle()
   if (!data) return null
-  const { data: prof } = await supabase.from('profiles').select('full_name, phone').eq('id', data.seller_id).maybeSingle()
+  const { data: prof } = await supabase.from('profiles').select('full_name, email').eq('id', data.seller_id).maybeSingle()
   return { ...(data as unknown as Listing), profiles: prof || undefined }
 }
 

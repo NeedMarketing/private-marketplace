@@ -2,6 +2,7 @@ export type Profile = {
   id: string
   full_name: string
   phone: string
+  email?: string
   user_type: 'buyer' | 'seller' | 'both'
   created_at: string
   updated_at: string
@@ -26,11 +27,11 @@ export type Listing = {
   vin: string
   description: string
   images: string[]
-  contact_preference: 'message' | 'phone' | 'both'
+  contact_preference: 'message' | 'phone' | 'email' | 'both'
   status: 'active' | 'sold' | 'draft'
   created_at?: string
   updated_at?: string
-  profiles?: { full_name: string; phone: string }
+  profiles?: { full_name?: string; phone?: string; email?: string }
 }
 
 export type Conversation = {
