@@ -43,43 +43,33 @@ const dd = "appearance-none bg-white border border-[#E5E5E5] rounded-full px-4 p
 
 type ListingCard = Pick<Listing, 'id' | 'year' | 'make' | 'model' | 'trim' | 'price' | 'mileage' | 'location' | 'images' | 'condition' | 'created_at'>
 
+// Compact, Facebook-Marketplace-style card for a dense multi-column grid.
 function Card({ l, saved, onToggle }: { l: ListingCard; saved: boolean; onToggle: (id: string) => void }) {
   return (
     <Link href={`/listing/${l.id}`} className="group block">
-      <div className="bg-white rounded-2xl border border-[#E5E5E5] shadow-[0_2px_12px_rgba(0,0,0,0.06)] hover:shadow-[0_8px_30px_rgba(0,0,0,0.10)] transition-all duration-300 overflow-hidden">
-        <div className="relative overflow-hidden bg-[#F5F5F3]" style={{ aspectRatio: '4/3' }}>
+      <div className="bg-white rounded-xl border border-[#E5E5E5] shadow-[0_1px_6px_rgba(0,0,0,0.05)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.10)] transition-all duration-200 overflow-hidden">
+        <div className="relative overflow-hidden bg-[#F5F5F3]" style={{ aspectRatio: '1/1' }}>
           <img
             src={l.images[0] || 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=480&q=75'}
             alt={`${l.year} ${l.make} ${l.model}`}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             loading="lazy"
           />
-          <span className={`absolute top-3 left-3 text-[11px] font-semibold px-2.5 py-1 rounded-full ${conditionStyle[l.condition] || 'bg-gray-50 text-gray-700'}`}>{l.condition}</span>
           <button
             onClick={(e) => { e.preventDefault(); onToggle(l.id) }}
-            className="absolute top-3 right-3 w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white transition-colors shadow-sm"
+            className="absolute top-2 right-2 w-7 h-7 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white transition-colors shadow-sm"
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill={saved ? '#ef4444' : 'none'} stroke={saved ? '#ef4444' : '#6B6B6B'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill={saved ? '#ef4444' : 'none'} stroke={saved ? '#ef4444' : '#6B6B6B'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
           </button>
+          <span className={`absolute top-2 left-2 text-[10px] font-semibold px-2 py-0.5 rounded-full ${conditionStyle[l.condition] || 'bg-gray-50 text-gray-700'}`}>{l.condition}</span>
         </div>
-        <div className="p-4">
-          <div className="flex items-start justify-between gap-2 mb-0.5">
-            <h3 className="text-[15px] font-semibold text-[#111111] leading-snug">{l.year} {l.make} {l.model}</h3>
-            <span className="text-[15px] font-bold text-[#111111] whitespace-nowrap shrink-0">{formatPrice(l.price)}</span>
-          </div>
-          <p className="text-[13px] text-[#6B6B6B] mb-3">{l.trim}</p>
-          <div className="flex items-center gap-2 text-[13px] text-[#6B6B6B]">
-            <span>{formatMileage(l.mileage)}</span>
-            <span className="text-[#E5E5E5]">·</span>
-            <span className="flex items-center gap-1">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
-              {l.location}
-            </span>
-          </div>
-          <div className="mt-3 pt-3 border-t border-[#F0F0EE] flex items-center gap-1.5">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#111111" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-            <span className="text-[12px] text-[#6B6B6B]">Private Seller · Verified</span>
-          </div>
+        <div className="p-2.5">
+          <p className="text-[15px] font-bold text-[#111111] leading-tight">{formatPrice(l.price)}</p>
+          <p className="text-[13px] text-[#111111] truncate mt-0.5">{l.year} {l.make} {l.model}</p>
+          <p className="text-[12px] text-[#6B6B6B] truncate mt-0.5 flex items-center gap-1">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            {formatMileage(l.mileage)} · {l.location}
+          </p>
         </div>
       </div>
     </Link>
@@ -278,7 +268,7 @@ export default function BrowsePage() {
 
         {/* Grid */}
         {fetching ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
             {[...Array(6)].map((_, i) => (
               <div key={i} className="bg-white rounded-2xl border border-[#E5E5E5] overflow-hidden animate-pulse">
                 <div className="bg-[#F5F5F3]" style={{ aspectRatio: '4/3' }} />
@@ -309,7 +299,7 @@ export default function BrowsePage() {
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
                   {listings.map((l) => <Card key={l.id} l={l} saved={savedIds.has(l.id)} onToggle={toggleSave} />)}
                 </div>
 
@@ -339,7 +329,7 @@ export default function BrowsePage() {
                   <h2 className="text-[13px] font-semibold text-[#6B6B6B] uppercase tracking-wider whitespace-nowrap">Cars outside {loc.trim()}</h2>
                   <div className="flex-1 h-px bg-[#E5E5E5]" />
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
                   {outside.map((l) => <Card key={l.id} l={l} saved={savedIds.has(l.id)} onToggle={toggleSave} />)}
                 </div>
               </section>
