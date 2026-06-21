@@ -1,10 +1,11 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Navbar from '@/components/Navbar'
 import BetaStats from '@/components/BetaStats'
+import ImageCropper from '@/components/ImageCropper'
 import { useAuth } from '@/context/AuthContext'
 import { createClient } from '@/lib/supabase/client'
 import { formatPrice, formatMileage, timeAgo } from '@/lib/utils'
@@ -34,7 +35,33 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
-function EditModal({ listing, onSave, onClose }: { listing: Listing; onSave: (l: Listing) => void; onClose: () => void }) {
+function EditModal({ listing, userId, onSave, onClose }: { listing: Listing; userId: string; onSave: (l: Listing) => void; onClose: () => void }) {
+  const [images, setImages] = useState<string[]>(listing.images || [])
+  const [cropQueue, setCropQueue] = useState<File[]>([])
+  const [uploading, setUploading] = useState(false)
+  const editFileRef = useRef<HTMLInputElement>(null)
+
+  const queuePhotos = (files: FileList) => {
+    const room = 8 - images.length - cropQueue.length
+    if (room <= 0) return
+    setCropQueue((prev) => [...prev, ...Array.from(files).filter((f) => f.type.startsWith('image/')).slice(0, room)])
+  }
+
+  const onCropDone = async (cropped: File) => {
+    setCropQueue((prev) => prev.slice(1))
+    setUploading(true)
+    const supabase = createClient()
+    const ext = 'jpg'
+    const path = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+    const { data, error: upErr } = await supabase.storage.from('listing-images').upload(path, cropped, { cacheControl: '3600', upsert: false })
+    if (upErr || !data) { console.error('Photo upload failed:', upErr); alert(upErr?.message || 'Photo upload failed.'); setUploading(false); return }
+    const { data: { publicUrl } } = supabase.storage.from('listing-images').getPublicUrl(data.path)
+    setImages((prev) => [...prev, publicUrl])
+    setUploading(false)
+  }
+  const removePhoto = (i: number) => setImages((prev) => prev.filter((_, idx) => idx !== i))
+  const makeMain = (i: number) => setImages((prev) => { const n = [...prev]; const [m] = n.splice(i, 1); return [m, ...n] })
+
   const [form, setForm] = useState({
     year: String(listing.year),
     make: listing.make,
@@ -82,6 +109,7 @@ function EditModal({ listing, onSave, onClose }: { listing: Listing; onSave: (l:
         description: form.description,
         contact_preference: form.contact_preference,
         status: form.status,
+        images,
         updated_at: new Date().toISOString(),
       })
       .eq('id', listing.id)
@@ -96,6 +124,17 @@ function EditModal({ listing, onSave, onClose }: { listing: Listing; onSave: (l:
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      {cropQueue.length > 0 && (
+        <ImageCropper
+          key={cropQueue.length}
+          file={cropQueue[0]}
+          index={images.length}
+          total={images.length + cropQueue.length}
+          aspect={4 / 3}
+          onDone={onCropDone}
+          onCancel={() => setCropQueue((prev) => prev.slice(1))}
+        />
+      )}
       <div className="bg-white rounded-2xl shadow-[0_24px_64px_rgba(0,0,0,0.18)] w-full max-w-lg max-h-[88vh] flex flex-col">
         <div className="flex items-center justify-between p-5 border-b border-[#E5E5E5] shrink-0">
           <h3 className="text-[16px] font-semibold text-[#111111]">Edit listing</h3>
@@ -105,6 +144,31 @@ function EditModal({ listing, onSave, onClose }: { listing: Listing; onSave: (l:
         </div>
 
         <div className="p-5 flex flex-col gap-4 overflow-y-auto">
+          {/* Photos */}
+          <Field label="Photos">
+            <div className="grid grid-cols-4 gap-2">
+              {images.map((img, i) => (
+                <div key={img} className="relative group aspect-square rounded-lg overflow-hidden bg-[#F5F5F3]">
+                  <img src={img} alt="" className="w-full h-full object-cover" />
+                  {i === 0 && <span className="absolute bottom-1 left-1 text-[9px] font-bold text-white bg-black/60 rounded px-1">Main</span>}
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5">
+                    {i !== 0 && <button type="button" onClick={() => makeMain(i)} title="Make main" className="text-[9px] font-semibold text-white bg-white/20 hover:bg-white/30 rounded px-1.5 py-1">Main</button>}
+                    <button type="button" onClick={() => removePhoto(i)} title="Remove" className="w-6 h-6 bg-white/20 hover:bg-red-500 rounded-full flex items-center justify-center">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {images.length < 8 && (
+                <button type="button" onClick={() => editFileRef.current?.click()} disabled={uploading} className="aspect-square rounded-lg border-2 border-dashed border-[#E5E5E5] flex items-center justify-center hover:border-[#111111] transition-colors disabled:opacity-50">
+                  {uploading ? <div className="w-4 h-4 border-2 border-[#6B6B6B] border-t-transparent rounded-full animate-spin" /> : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6B6B6B" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>}
+                </button>
+              )}
+            </div>
+            <input ref={editFileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => e.target.files && queuePhotos(e.target.files)} />
+            <p className="text-[11px] text-[#6B6B6B] mt-1.5">Hover a photo to remove or set as main. New photos are cropped to fit.</p>
+          </Field>
+
           <div className="grid grid-cols-2 gap-3">
             <Field label="Year"><input value={form.year} onChange={(e) => set('year', e.target.value)} type="number" min="1900" max="2026" className={inp} /></Field>
             <Field label="Make">
@@ -321,6 +385,7 @@ export default function DashboardPage() {
       {editTarget && (
         <EditModal
           listing={editTarget}
+          userId={user.id}
           onSave={(updated) => setMyListings((prev) => prev.map((l) => l.id === updated.id ? updated : l))}
           onClose={() => setEditTarget(null)}
         />
