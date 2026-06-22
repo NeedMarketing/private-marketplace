@@ -35,6 +35,7 @@ export default function MessagesPage() {
   }
 
   const [otherNames, setOtherNames] = useState<Record<string, string>>({})
+  const [negMap, setNegMap] = useState<Record<string, { price: number | null; buyerId: string | null }>>({})
 
   useEffect(() => {
     if (!user) return
@@ -60,9 +61,27 @@ export default function MessagesPage() {
         ;(profs || []).forEach((p) => { map[p.id] = p.full_name || 'Private Seller' })
         setOtherNames(map)
       }
+
+      // Negotiation state per listing, to split threads into In negotiation vs Interested.
+      const listingIds = Array.from(new Set(convs.map((c) => c.listing_id)))
+      if (listingIds.length > 0) {
+        const { data: ls } = await supabase.from('listings').select('id, negotiation_price, negotiation_buyer_id').in('id', listingIds)
+        const nm: Record<string, { price: number | null; buyerId: string | null }> = {}
+        ;(ls || []).forEach((l: { id: string; negotiation_price: number | null; negotiation_buyer_id: string | null }) => {
+          nm[l.id] = { price: l.negotiation_price, buyerId: l.negotiation_buyer_id }
+        })
+        setNegMap(nm)
+      }
     }
     load()
   }, [user])
+
+  // A thread is "in negotiation" when this conversation's buyer is the listing's
+  // active negotiating buyer; otherwise it's an "Interested" (questions) thread.
+  const isNegotiation = (c: Conversation) => {
+    const n = negMap[c.listing_id]
+    return !!n && n.price != null && n.buyerId === c.buyer_id
+  }
 
   if (loading || !user) return <div className="min-h-screen bg-[#FAFAF7] flex items-center justify-center"><div className="w-6 h-6 border-2 border-[#111111] border-t-transparent rounded-full animate-spin" /></div>
 
@@ -106,36 +125,51 @@ export default function MessagesPage() {
             <p className="text-[14px] text-[#6B6B6B] mb-6 max-w-xs mx-auto">Browse listings and message a seller to start a conversation.</p>
             <Link href="/browse" className="inline-block bg-[#111111] text-white text-[13px] font-semibold px-6 py-3 rounded-full hover:bg-[#333] transition-colors">Browse listings</Link>
           </div>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {conversations.map((c) => {
-              const otherId = c.buyer_id === user.id ? c.seller_id : c.buyer_id
-              const other = otherNames[otherId]
-
-              return (
-                <Link key={c.id} href={`/messages/${c.id}`} className="bg-white border border-[#E5E5E5] rounded-2xl p-4 flex items-center gap-4 hover:shadow-[0_4px_20px_rgba(0,0,0,0.08)] hover:border-transparent transition-all group">
-                  <div className="w-14 h-14 rounded-xl overflow-hidden bg-[#F5F5F3] shrink-0">
-                    <img src={c.listing_image || 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=120&q=70'} alt="" className="w-full h-full object-cover" />
+        ) : (() => {
+          const renderRow = (c: Conversation) => {
+            const otherId = c.buyer_id === user.id ? c.seller_id : c.buyer_id
+            const other = otherNames[otherId]
+            return (
+              <Link key={c.id} href={`/messages/${c.id}`} className="bg-white border border-[#E5E5E5] rounded-2xl p-4 flex items-center gap-4 hover:shadow-[0_4px_20px_rgba(0,0,0,0.08)] hover:border-transparent transition-all group">
+                <div className="w-14 h-14 rounded-xl overflow-hidden bg-[#F5F5F3] shrink-0">
+                  <img src={c.listing_image || 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=120&q=70'} alt="" className="w-full h-full object-cover" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2 mb-0.5">
+                    <p className="text-[14px] font-semibold text-[#111111] truncate">{other || 'Private Seller'}</p>
+                    <span className="text-[11px] text-[#6B6B6B] whitespace-nowrap shrink-0">{timeAgo(c.last_message_at)}</span>
                   </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2 mb-0.5">
-                      <p className="text-[14px] font-semibold text-[#111111] truncate">{other || 'Private Seller'}</p>
-                      <span className="text-[11px] text-[#6B6B6B] whitespace-nowrap shrink-0">{timeAgo(c.last_message_at)}</span>
-                    </div>
-                    <p className="text-[12px] text-[#6B6B6B] mb-1 flex items-center gap-1">
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                      {c.listing_title}
-                    </p>
-                    <p className="text-[13px] text-[#111111] truncate">{c.last_message}</p>
-                  </div>
-
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B6B6B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 group-hover:translate-x-0.5 transition-transform"><polyline points="9 18 15 12 9 6"/></svg>
-                </Link>
-              )
-            })}
-          </div>
-        )}
+                  <p className="text-[12px] text-[#6B6B6B] mb-1 flex items-center gap-1">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    {c.listing_title}
+                  </p>
+                  <p className="text-[13px] text-[#111111] truncate">{c.last_message}</p>
+                </div>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B6B6B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0 group-hover:translate-x-0.5 transition-transform"><polyline points="9 18 15 12 9 6"/></svg>
+              </Link>
+            )
+          }
+          const negotiating = conversations.filter(isNegotiation)
+          const interested = conversations.filter((c) => !isNegotiation(c))
+          return (
+            <div className="flex flex-col gap-8">
+              {negotiating.length > 0 && (
+                <div>
+                  <h2 className="text-[13px] font-semibold text-amber-700 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-amber-500" /> In negotiation ({negotiating.length})
+                  </h2>
+                  <div className="flex flex-col gap-2">{negotiating.map(renderRow)}</div>
+                </div>
+              )}
+              <div>
+                <h2 className="text-[13px] font-semibold text-[#6B6B6B] uppercase tracking-wider mb-3">Interested · questions ({interested.length})</h2>
+                {interested.length === 0
+                  ? <p className="text-[13px] text-[#6B6B6B]">No question threads right now.</p>
+                  : <div className="flex flex-col gap-2">{interested.map(renderRow)}</div>}
+              </div>
+            </div>
+          )
+        })()}
       </div>
 
       <footer className="border-t border-[#E5E5E5] mt-16">

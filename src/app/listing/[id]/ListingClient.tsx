@@ -19,7 +19,6 @@ export default function ListingClient({ initialListing }: { initialListing: List
   const [activeImg, setActiveImg] = useState(0)
   const [messaging, setMessaging] = useState(false)
   const [msgError, setMsgError] = useState('')
-  const [interested, setInterested] = useState(false)
   const [likeCount, setLikeCount] = useState(0)
   const [liked, setLiked] = useState(false)
   const [offerOpen, setOfferOpen] = useState(false)
@@ -479,13 +478,6 @@ export default function ListingClient({ initialListing }: { initialListing: List
                     {msgError && <p className="text-[12px] text-red-600 mb-2">{msgError}</p>}
                     <button onClick={() => { if (!user) { router.push(`/auth/login?next=/listing/${listing.id}`); return } setOfferAmount(''); setOfferError(''); setOfferOpen(true) }} className="w-full border border-[#E5E5E5] text-[#111111] text-[14px] font-semibold py-3 rounded-xl hover:border-[#111111] transition-colors mb-2">
                       Make an offer
-                    </button>
-                    <button onClick={() => { if (!user) { router.push(`/auth/login?next=/listing/${listing.id}`); return } setInterested(true) }} className={`w-full border text-[14px] font-semibold py-3 rounded-xl transition-colors flex items-center justify-center gap-2 ${interested ? 'border-emerald-500 text-emerald-600 bg-emerald-50' : 'border-[#E5E5E5] text-[#111111] hover:border-[#111111]'}`}>
-                      {interested ? (
-                        <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg> Marked as interested</>
-                      ) : (
-                        <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg> I&apos;m interested</>
-                      )}
                     </button>
                     <button onClick={toggleLike} className={`w-full border text-[13px] font-medium py-2.5 rounded-xl transition-colors mt-1 flex items-center justify-center gap-2 ${liked ? 'border-[#111111] text-[#111111]' : 'border-[#E5E5E5] text-[#6B6B6B] hover:border-[#111111] hover:text-[#111111]'}`}>
                       <svg width="14" height="14" viewBox="0 0 24 24" fill={liked ? '#ef4444' : 'none'} stroke={liked ? '#ef4444' : 'currentColor'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
