@@ -460,8 +460,13 @@ export default function ListingClient({ initialListing }: { initialListing: List
                   </div>
                 ) : locked ? (
                   <>
-                    <p className="text-[13px] text-[#6B6B6B] mb-3">This car is in negotiation. New messages are locked — you can still step in with a higher offer.</p>
-                    <button onClick={() => { setOfferAmount(String(minOffer)); setOfferError(''); setOfferOpen(true) }} className="w-full bg-[#111111] text-white text-[14px] font-semibold py-3.5 rounded-xl hover:bg-[#333] transition-colors mb-2">
+                    <p className="text-[13px] text-[#6B6B6B] mb-3">This car is in negotiation at {formatPrice(listing.negotiation_price as number)}. You can still message the seller with questions, or step in with a higher offer.</p>
+                    <button onClick={handleMessage} disabled={messaging} className="w-full bg-[#111111] text-white text-[14px] font-semibold py-3.5 rounded-xl hover:bg-[#333] transition-colors disabled:opacity-60 mb-2 flex items-center justify-center gap-2">
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                      {messaging ? 'Opening chat…' : 'Message to get info on car'}
+                    </button>
+                    {msgError && <p className="text-[12px] text-red-600 mb-2">{msgError}</p>}
+                    <button onClick={() => { if (!user) { router.push(`/auth/login?next=/listing/${listing.id}`); return } setOfferAmount(String(minOffer)); setOfferError(''); setOfferOpen(true) }} className="w-full border border-[#111111] text-[#111111] text-[14px] font-semibold py-3 rounded-xl hover:bg-[#F5F5F3] transition-colors mb-2">
                       Break negotiation · offer higher
                     </button>
                     <button onClick={toggleLike} className={`w-full border text-[13px] font-medium py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 ${liked ? 'border-[#111111] text-[#111111]' : 'border-[#E5E5E5] text-[#6B6B6B] hover:border-[#111111] hover:text-[#111111]'}`}>
@@ -515,9 +520,14 @@ export default function ListingClient({ initialListing }: { initialListing: List
           <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-[#E5E5E5] p-4 z-40">
             <div className="flex gap-3 max-w-md mx-auto">
               {locked ? (
-                <button onClick={() => { if (!user) { router.push(`/auth/login?next=/listing/${listing.id}`); return } setOfferAmount(String(minOffer)); setOfferError(''); setOfferOpen(true) }} className="flex-1 bg-[#111111] text-white text-[14px] font-semibold py-3.5 rounded-xl hover:bg-[#333] transition-colors">
-                  Offer higher than {formatPrice(listing.negotiation_price as number)}
-                </button>
+                <>
+                  <button onClick={handleMessage} disabled={messaging} className="flex-1 bg-[#111111] text-white text-[14px] font-semibold py-3.5 rounded-xl hover:bg-[#333] transition-colors disabled:opacity-60">
+                    {messaging ? 'Opening…' : 'Get info'}
+                  </button>
+                  <button onClick={() => { if (!user) { router.push(`/auth/login?next=/listing/${listing.id}`); return } setOfferAmount(String(minOffer)); setOfferError(''); setOfferOpen(true) }} className="border border-[#111111] text-[#111111] text-[14px] font-semibold px-4 py-3.5 rounded-xl hover:bg-[#F5F5F3] transition-colors">
+                    Offer higher
+                  </button>
+                </>
               ) : (
                 <>
                   <button onClick={handleMessage} disabled={messaging} className="flex-1 bg-[#111111] text-white text-[14px] font-semibold py-3.5 rounded-xl hover:bg-[#333] transition-colors disabled:opacity-60">
