@@ -501,11 +501,10 @@ export default function ListingClient({ initialListing }: { initialListing: List
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2.5 mb-3">
+                <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2.5">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                   <span className="text-[12px] font-medium text-emerald-700">Identity verified by private.</span>
                 </div>
-                <Link href={`/seller/${listing.seller_id}`} className="block text-center text-[13px] font-semibold text-[#111111] border border-[#E5E5E5] rounded-xl py-2.5 hover:border-[#111111] transition-colors">View seller&apos;s other cars</Link>
               </div>
             </div>
           </div>
