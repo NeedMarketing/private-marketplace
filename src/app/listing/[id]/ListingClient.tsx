@@ -22,9 +22,18 @@ export default function ListingClient({ initialListing }: { initialListing: List
   const [interested, setInterested] = useState(false)
   const [likeCount, setLikeCount] = useState(0)
   const [liked, setLiked] = useState(false)
+  const [offerOpen, setOfferOpen] = useState(false)
+  const [offerAmount, setOfferAmount] = useState('')
+  const [offerError, setOfferError] = useState('')
+  const [offerSubmitting, setOfferSubmitting] = useState(false)
   const touchStartX = useRef<number | null>(null)
 
   const isOwner = user && listing.seller_id === user.id
+  const inNegotiation = listing.negotiation_price != null
+  const isNegBuyer = !!user && listing.negotiation_buyer_id === user.id
+  // An outsider can't open a normal chat while the car is in negotiation — only outbid.
+  const locked = inNegotiation && !isNegBuyer && !isOwner
+  const minOffer = inNegotiation ? (listing.negotiation_price as number) + 1 : 0
 
   // Load the persistent like count + whether the current user has liked it.
   useEffect(() => {
@@ -142,6 +151,48 @@ export default function ListingClient({ initialListing }: { initialListing: List
     if (data) setListing((prev) => ({ ...prev, status: 'sold' }))
   }
 
+  // Submit an offer (initial, or a higher offer to outbid). Creates/reuses the
+  // buyer↔seller conversation, posts the offer message + an offers row, notifies.
+  const submitOffer = async () => {
+    if (!user) { router.push(`/auth/login?next=/listing/${listing.id}`); return }
+    const amount = Math.round(Number(offerAmount))
+    if (!amount || amount <= 0) { setOfferError('Enter an offer amount.'); return }
+    if (inNegotiation && amount <= (listing.negotiation_price as number)) {
+      setOfferError(`Your offer must be higher than the current ${formatPrice(listing.negotiation_price as number)}.`)
+      return
+    }
+    setOfferSubmitting(true); setOfferError('')
+    try {
+      const supabase = createClient()
+      let convId: string
+      const { data: existing } = await supabase.from('conversations').select('id')
+        .eq('listing_id', listing.id).eq('buyer_id', user.id).maybeSingle()
+      if (existing) {
+        convId = existing.id
+      } else {
+        const { data: conv, error } = await supabase.from('conversations').insert({
+          listing_id: listing.id, buyer_id: user.id, seller_id: listing.seller_id,
+          listing_title: `${listing.year} ${listing.make} ${listing.model}`,
+          listing_image: listing.images[0] || '', last_message: '', last_message_at: new Date().toISOString(),
+        }).select('id').single()
+        if (error || !conv) { setOfferError(error?.message || 'Could not start the offer.'); setOfferSubmitting(false); return }
+        convId = conv.id
+      }
+
+      const offerText = `💰 Offer: ${formatPrice(amount)}`
+      await supabase.from('messages').insert({ conversation_id: convId, sender_id: user.id, sender_name: profile?.full_name || 'Buyer', text: offerText })
+      const { error: offErr } = await supabase.from('offers').insert({
+        listing_id: listing.id, buyer_id: user.id, seller_id: listing.seller_id, conversation_id: convId, amount, status: 'pending',
+      })
+      if (offErr) { console.error('Offer insert failed:', offErr); setOfferError(offErr.message); setOfferSubmitting(false); return }
+      await supabase.from('conversations').update({ last_message: offerText, last_message_at: new Date().toISOString() }).eq('id', convId)
+      notifyNewMessage(convId, user.id)
+      router.push(`/messages/${convId}`)
+    } catch (e) {
+      setOfferError(e instanceof Error ? e.message : 'Something went wrong.'); setOfferSubmitting(false)
+    }
+  }
+
   const specs = [
     { label: 'Mileage', value: formatMileage(listing.mileage) },
     { label: 'Year', value: String(listing.year) },
@@ -156,6 +207,34 @@ export default function ListingClient({ initialListing }: { initialListing: List
   return (
     <div className="min-h-screen bg-[#FAFAF7]">
       <Navbar />
+
+      {/* Offer / higher-offer modal */}
+      {offerOpen && (
+        <div className="fixed inset-0 z-[60] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setOfferOpen(false)}>
+          <div className="bg-white rounded-2xl shadow-[0_24px_64px_rgba(0,0,0,0.2)] w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-[17px] font-semibold text-[#111111] mb-1">{inNegotiation ? 'Make a higher offer' : 'Make an offer'}</h3>
+            <p className="text-[13px] text-[#6B6B6B] mb-4">
+              {inNegotiation
+                ? `Currently in negotiation at ${formatPrice(listing.negotiation_price as number)}. Your offer must be higher.`
+                : `Asking price ${formatPrice(listing.price)}. Send the seller your offer.`}
+            </p>
+            <div className="relative mb-3">
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[15px] text-[#6B6B6B]">$</span>
+              <input
+                type="number" autoFocus value={offerAmount} min={minOffer || undefined}
+                onChange={(e) => setOfferAmount(e.target.value)}
+                placeholder={inNegotiation ? String(minOffer) : String(listing.price)}
+                className="w-full border border-[#E5E5E5] rounded-xl pl-8 pr-4 py-3 text-[15px] text-[#111111] outline-none focus:border-[#111111]"
+              />
+            </div>
+            {offerError && <p className="text-[12px] text-red-600 mb-3">{offerError}</p>}
+            <div className="flex gap-3">
+              <button onClick={() => setOfferOpen(false)} className="flex-1 py-3 rounded-xl border border-[#E5E5E5] text-[14px] font-medium text-[#6B6B6B] hover:border-[#111111] transition-colors">Cancel</button>
+              <button onClick={submitOffer} disabled={offerSubmitting} className="flex-1 py-3 rounded-xl bg-[#111111] text-white text-[14px] font-semibold hover:bg-[#333] transition-colors disabled:opacity-50">{offerSubmitting ? 'Sending…' : 'Send offer'}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-7xl mx-auto px-5 py-8">
         <Link href="/browse" className="inline-flex items-center gap-1.5 text-[13px] text-[#6B6B6B] hover:text-[#111111] transition-colors mb-6">
@@ -308,6 +387,12 @@ export default function ListingClient({ initialListing }: { initialListing: List
                 <div className="mb-4">
                   <DealRating id={listing.id} make={listing.make} model={listing.model} year={listing.year} price={listing.price} />
                 </div>
+                {inNegotiation && (
+                  <div className="mb-4 flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-2.5">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                    <span className="text-[13px] font-semibold text-amber-800">In negotiation: {formatPrice(listing.negotiation_price as number)}</span>
+                  </div>
+                )}
                 <p className="text-[13px] text-[#6B6B6B] mb-6 flex items-center gap-1">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                   {listing.location}
@@ -325,13 +410,27 @@ export default function ListingClient({ initialListing }: { initialListing: List
                     <p className="text-[14px] font-semibold text-[#111111]">This car has been sold.</p>
                     <Link href="/browse" className="text-[13px] text-[#6B6B6B] hover:text-[#111111] underline mt-1 inline-block">Browse similar →</Link>
                   </div>
+                ) : locked ? (
+                  <>
+                    <p className="text-[13px] text-[#6B6B6B] mb-3">This car is in negotiation. New messages are locked — you can still step in with a higher offer.</p>
+                    <button onClick={() => { setOfferAmount(String(minOffer)); setOfferError(''); setOfferOpen(true) }} className="w-full bg-[#111111] text-white text-[14px] font-semibold py-3.5 rounded-xl hover:bg-[#333] transition-colors mb-2">
+                      Break negotiation · offer higher
+                    </button>
+                    <button onClick={toggleLike} className={`w-full border text-[13px] font-medium py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 ${liked ? 'border-[#111111] text-[#111111]' : 'border-[#E5E5E5] text-[#6B6B6B] hover:border-[#111111] hover:text-[#111111]'}`}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill={liked ? '#ef4444' : 'none'} stroke={liked ? '#ef4444' : 'currentColor'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                      {liked ? 'Saved' : 'Save'}{likeCount > 0 ? ` · ${likeCount}` : ''}
+                    </button>
+                  </>
                 ) : (
                   <>
                     <button onClick={handleMessage} disabled={messaging} className="w-full bg-[#111111] text-white text-[14px] font-semibold py-3.5 rounded-xl hover:bg-[#333] transition-colors disabled:opacity-60 mb-2 flex items-center justify-center gap-2">
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                      {messaging ? 'Opening chat…' : 'Message seller'}
+                      {messaging ? 'Opening chat…' : isNegBuyer ? 'Continue negotiation' : 'Message seller'}
                     </button>
                     {msgError && <p className="text-[12px] text-red-600 mb-2">{msgError}</p>}
+                    <button onClick={() => { if (!user) { router.push(`/auth/login?next=/listing/${listing.id}`); return } setOfferAmount(''); setOfferError(''); setOfferOpen(true) }} className="w-full border border-[#E5E5E5] text-[#111111] text-[14px] font-semibold py-3 rounded-xl hover:border-[#111111] transition-colors mb-2">
+                      Make an offer
+                    </button>
                     <button onClick={() => { if (!user) { router.push(`/auth/login?next=/listing/${listing.id}`); return } setInterested(true) }} className={`w-full border text-[14px] font-semibold py-3 rounded-xl transition-colors flex items-center justify-center gap-2 ${interested ? 'border-emerald-500 text-emerald-600 bg-emerald-50' : 'border-[#E5E5E5] text-[#111111] hover:border-[#111111]'}`}>
                       {interested ? (
                         <><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="20 6 9 17 4 12"/></svg> Marked as interested</>
@@ -361,10 +460,11 @@ export default function ListingClient({ initialListing }: { initialListing: List
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2.5">
+                <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2.5 mb-3">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                   <span className="text-[12px] font-medium text-emerald-700">Identity verified by private.</span>
                 </div>
+                <Link href={`/seller/${listing.seller_id}`} className="block text-center text-[13px] font-semibold text-[#111111] border border-[#E5E5E5] rounded-xl py-2.5 hover:border-[#111111] transition-colors">View seller&apos;s other cars</Link>
               </div>
             </div>
           </div>
@@ -374,12 +474,20 @@ export default function ListingClient({ initialListing }: { initialListing: List
         {!isOwner && listing.status === 'active' && (
           <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-[#E5E5E5] p-4 z-40">
             <div className="flex gap-3 max-w-md mx-auto">
-              <button onClick={handleMessage} disabled={messaging} className="flex-1 bg-[#111111] text-white text-[14px] font-semibold py-3.5 rounded-xl hover:bg-[#333] transition-colors disabled:opacity-60">
-                {messaging ? 'Opening…' : 'Message seller'}
-              </button>
-              <button onClick={() => setInterested(!interested)} className={`border text-[14px] font-semibold px-4 py-3.5 rounded-xl transition-colors ${interested ? 'border-emerald-500 bg-emerald-50 text-emerald-600' : 'border-[#E5E5E5] text-[#111111] hover:border-[#111111]'}`}>
-                {interested ? '✓' : '♡'}
-              </button>
+              {locked ? (
+                <button onClick={() => { if (!user) { router.push(`/auth/login?next=/listing/${listing.id}`); return } setOfferAmount(String(minOffer)); setOfferError(''); setOfferOpen(true) }} className="flex-1 bg-[#111111] text-white text-[14px] font-semibold py-3.5 rounded-xl hover:bg-[#333] transition-colors">
+                  Offer higher than {formatPrice(listing.negotiation_price as number)}
+                </button>
+              ) : (
+                <>
+                  <button onClick={handleMessage} disabled={messaging} className="flex-1 bg-[#111111] text-white text-[14px] font-semibold py-3.5 rounded-xl hover:bg-[#333] transition-colors disabled:opacity-60">
+                    {messaging ? 'Opening…' : isNegBuyer ? 'Continue' : 'Message seller'}
+                  </button>
+                  <button onClick={() => { if (!user) { router.push(`/auth/login?next=/listing/${listing.id}`); return } setOfferAmount(''); setOfferError(''); setOfferOpen(true) }} className="border border-[#E5E5E5] text-[#111111] text-[14px] font-semibold px-4 py-3.5 rounded-xl hover:border-[#111111] transition-colors">
+                    Offer
+                  </button>
+                </>
+              )}
             </div>
           </div>
         )}

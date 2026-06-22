@@ -8,7 +8,7 @@ import { useAuth } from '@/context/AuthContext'
 import { createClient } from '@/lib/supabase/client'
 import { notifyNewMessage } from '@/lib/push'
 import { formatPrice, timeAgo } from '@/lib/utils'
-import type { Conversation, Message, Listing } from '@/lib/types'
+import type { Conversation, Message, Listing, Offer } from '@/lib/types'
 
 export default function ThreadPage({ params }: { params: { id: string } }) {
   const { user, profile, loading } = useAuth()
@@ -20,6 +20,7 @@ export default function ThreadPage({ params }: { params: { id: string } }) {
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [sendError, setSendError] = useState('')
+  const [offers, setOffers] = useState<Offer[]>([])
   const [notFound, setNotFound] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -68,10 +69,18 @@ export default function ThreadPage({ params }: { params: { id: string } }) {
       // Listing context — maybeSingle so a sold/deleted listing doesn't throw.
       supabase
         .from('listings')
-        .select('id, year, make, model, price, location, images')
+        .select('id, year, make, model, price, location, images, negotiation_price, negotiation_buyer_id')
         .eq('id', conv.listing_id)
         .maybeSingle()
         .then(({ data: l }) => setListing(l as typeof l & Listing))
+
+      // Offers in this conversation (for the accept-offer banner).
+      supabase
+        .from('offers')
+        .select('id, listing_id, buyer_id, seller_id, conversation_id, amount, status, created_at')
+        .eq('conversation_id', params.id)
+        .order('created_at', { ascending: true })
+        .then(({ data }) => setOffers((data || []) as Offer[]))
     }
     load()
 
@@ -163,6 +172,31 @@ export default function ThreadPage({ params }: { params: { id: string } }) {
     setSending(false)
     inputRef.current?.focus()
   }
+
+  // Seller accepts an offer → the listing goes "In negotiation" at that price/buyer.
+  const acceptOffer = async (offer: Offer) => {
+    if (!user || !conversation) return
+    const supabase = createClient()
+    const { error: lErr } = await supabase
+      .from('listings')
+      .update({ negotiation_price: offer.amount, negotiation_buyer_id: offer.buyer_id })
+      .eq('id', offer.listing_id)
+    if (lErr) { console.error('Accept offer failed:', lErr); alert(lErr.message); return }
+    await supabase.from('offers').update({ status: 'accepted' }).eq('id', offer.id)
+    setOffers((prev) => prev.map((o) => o.id === offer.id ? { ...o, status: 'accepted' } : o))
+    setListing((prev) => prev ? { ...prev, negotiation_price: offer.amount, negotiation_buyer_id: offer.buyer_id } : prev)
+
+    const text = `✅ Offer accepted — now in negotiation at ${formatPrice(offer.amount)}`
+    const { data: m } = await supabase.from('messages')
+      .insert({ conversation_id: conversation.id, sender_id: user.id, sender_name: profile?.full_name || 'Seller', text })
+      .select('id, conversation_id, sender_id, sender_name, text, created_at').single()
+    if (m) setMessages((prev) => [...prev, m as Message])
+    await supabase.from('conversations').update({ last_message: text, last_message_at: new Date().toISOString() }).eq('id', conversation.id)
+    notifyNewMessage(conversation.id, user.id)
+  }
+
+  const isSeller = !!conversation && conversation.seller_id === user?.id
+  const latestPending = [...offers].reverse().find((o) => o.status === 'pending')
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
@@ -266,6 +300,23 @@ export default function ThreadPage({ params }: { params: { id: string } }) {
       </div>
 
       {/* Input */}
+      {/* Offer banner */}
+      {latestPending && (
+        <div className="bg-amber-50 border-t border-amber-200">
+          <div className="max-w-3xl mx-auto px-5 py-3 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[13px] font-semibold text-amber-900">Offer on the table: {formatPrice(latestPending.amount)}</p>
+              <p className="text-[11px] text-amber-700">{isSeller ? 'Accept to put this car in negotiation at that price.' : 'Waiting for the seller to respond.'}</p>
+            </div>
+            {isSeller && (
+              <button onClick={() => acceptOffer(latestPending)} className="bg-[#111111] text-white text-[13px] font-semibold px-5 py-2.5 rounded-full hover:bg-[#333] transition-colors whitespace-nowrap shrink-0">
+                Accept {formatPrice(latestPending.amount)}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="bg-white border-t border-[#E5E5E5] sticky bottom-0">
         <div className="max-w-3xl mx-auto px-5 py-3">
           {sendError && <p className="text-[12px] text-red-600 mb-2 text-center">{sendError}</p>}

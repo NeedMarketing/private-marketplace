@@ -29,9 +29,22 @@ export type Listing = {
   images: string[]
   contact_preference: 'message' | 'phone' | 'email' | 'both'
   status: 'active' | 'sold' | 'draft'
+  negotiation_price?: number | null
+  negotiation_buyer_id?: string | null
   created_at?: string
   updated_at?: string
   profiles?: { full_name?: string; phone?: string; email?: string }
+}
+
+export type Offer = {
+  id: string
+  listing_id: string
+  buyer_id: string
+  seller_id: string
+  conversation_id: string | null
+  amount: number
+  status: 'pending' | 'accepted' | 'declined' | 'outbid'
+  created_at: string
 }
 
 export type Conversation = {

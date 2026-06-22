@@ -31,22 +31,25 @@ export default function DealRating({ id, make, model, year, price }: { id: strin
 
   useEffect(() => {
     const supabase = createClient()
-    supabase
-      .from('listings')
-      .select('price')
-      .eq('make', make)
-      .eq('model', model)
-      .gte('year', year - 2)
-      .lte('year', year + 2)
-      .in('status', ['active', 'sold'])
-      .neq('id', id)
-      .then(({ data }) => {
-        const prices = (data || []).map((d) => d.price).filter((p) => typeof p === 'number' && p > 0)
-        if (prices.length < MIN_COMPS) { setState('insufficient'); return }
-        const market = median(prices)
-        if (market <= 0) { setState('insufficient'); return }
-        setState({ tier: rate(price / market), market, comps: prices.length })
-      })
+    const pricesOf = (data: { price: number }[] | null) =>
+      (data || []).map((d) => d.price).filter((p) => typeof p === 'number' && p > 0)
+    const base = () => supabase
+      .from('listings').select('price')
+      .eq('make', make).eq('model', model)
+      .in('status', ['active', 'sold']).neq('id', id)
+
+    const run = async () => {
+      // Widen the comparable window in tiers until we have enough data points.
+      let prices = pricesOf((await base().gte('year', year - 2).lte('year', year + 2)).data)
+      if (prices.length < MIN_COMPS) prices = pricesOf((await base().gte('year', year - 5).lte('year', year + 5)).data)
+      if (prices.length < MIN_COMPS) prices = pricesOf((await base()).data) // any year, same model
+
+      if (prices.length < MIN_COMPS) { setState('insufficient'); return }
+      const market = median(prices)
+      if (market <= 0) { setState('insufficient'); return }
+      setState({ tier: rate(price / market), market, comps: prices.length })
+    }
+    run()
   }, [id, make, model, year, price])
 
   if (state === 'loading') {
@@ -69,7 +72,7 @@ export default function DealRating({ id, make, model, year, price }: { id: strin
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         <span className="text-[13px] font-bold">{tier.label}</span>
       </div>
-      <span className="text-[11px] opacity-80 mt-0.5">{tier.note} private. market avg ≈ {formatPrice(Math.round(market))} ({comps} comparable{comps !== 1 ? 's' : ''}).</span>
+      <span className="text-[11px] opacity-80 mt-0.5">{tier.note} Est. market value ≈ {formatPrice(Math.round(market))} based on {comps} comparable{comps !== 1 ? 's' : ''} on private.</span>
     </div>
   )
 }

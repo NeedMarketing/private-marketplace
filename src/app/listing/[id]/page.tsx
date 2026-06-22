@@ -8,7 +8,7 @@ import ListingClient from './ListingClient'
 
 const SITE_URL = 'https://privatecarz.com'
 const LISTING_COLUMNS =
-  'id, seller_id, year, make, model, trim, price, mileage, location, condition, title_status, color, interior_color, transmission, fuel_type, vin, description, images, contact_preference, status'
+  'id, seller_id, year, make, model, trim, price, mileage, location, condition, title_status, color, interior_color, transmission, fuel_type, vin, description, images, contact_preference, status, negotiation_price, negotiation_buyer_id'
 
 async function fetchListing(id: string): Promise<Listing | null> {
   const supabase = createClient()
