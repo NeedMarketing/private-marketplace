@@ -26,6 +26,7 @@ export default function ListingClient({ initialListing }: { initialListing: List
   const [offerAmount, setOfferAmount] = useState('')
   const [offerError, setOfferError] = useState('')
   const [offerSubmitting, setOfferSubmitting] = useState(false)
+  const [interestedList, setInterestedList] = useState<{ id: string; name: string; last_message: string; last_message_at: string }[]>([])
   const touchStartX = useRef<number | null>(null)
 
   const isOwner = user && listing.seller_id === user.id
@@ -47,6 +48,27 @@ export default function ListingClient({ initialListing }: { initialListing: List
       setLiked(false)
     }
   }, [listing.id, user])
+
+  // Owner view: load everyone who has reached out about this car ("People interested").
+  useEffect(() => {
+    if (!user || listing.seller_id !== user.id) return
+    const supabase = createClient()
+    const load = async () => {
+      const { data: convs } = await supabase
+        .from('conversations')
+        .select('id, buyer_id, last_message, last_message_at')
+        .eq('listing_id', listing.id)
+        .eq('seller_id', user.id)
+        .order('last_message_at', { ascending: false })
+      if (!convs || convs.length === 0) { setInterestedList([]); return }
+      const ids = Array.from(new Set(convs.map((c) => c.buyer_id)))
+      const { data: profs } = await supabase.from('profiles').select('id, full_name').in('id', ids)
+      const names: Record<string, string> = {}
+      ;(profs || []).forEach((p) => { names[p.id] = p.full_name || 'Interested buyer' })
+      setInterestedList(convs.map((c) => ({ id: c.id, name: names[c.buyer_id] || 'Interested buyer', last_message: c.last_message, last_message_at: c.last_message_at })))
+    }
+    load()
+  }, [user, listing.id, listing.seller_id])
 
   const toggleLike = async () => {
     if (!user) { router.push(`/auth/login?next=/listing/${listing.id}`); return }
@@ -342,6 +364,33 @@ export default function ListingClient({ initialListing }: { initialListing: List
               </div>
             )}
 
+            {/* People interested — only the listing owner sees this */}
+            {isOwner && (
+              <div className="bg-white border border-[#E5E5E5] rounded-2xl p-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)] mb-5">
+                <h2 className="text-[15px] font-semibold text-[#111111] mb-4">
+                  People interested{interestedList.length > 0 ? ` (${interestedList.length})` : ''}
+                </h2>
+                {interestedList.length === 0 ? (
+                  <p className="text-[13px] text-[#6B6B6B]">No one has reached out yet. When buyers message about this car, they&apos;ll show up here.</p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {interestedList.map((c) => (
+                      <Link key={c.id} href={`/messages/${c.id}`} className="flex items-center gap-3 p-3 rounded-xl border border-[#E5E5E5] hover:border-[#111111] transition-colors">
+                        <div className="w-9 h-9 rounded-full bg-[#111111] text-white text-[12px] font-bold flex items-center justify-center shrink-0">
+                          {c.name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] font-semibold text-[#111111] truncate">{c.name}</p>
+                          <p className="text-[12px] text-[#6B6B6B] truncate">{c.last_message || 'Started a conversation'}</p>
+                        </div>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6B6B6B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><polyline points="9 18 15 12 9 6"/></svg>
+                      </Link>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* VIN */}
             {listing.vin && (
               <div className="bg-white border border-[#E5E5E5] rounded-2xl p-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)] mb-5 flex items-center justify-between flex-wrap gap-3">
@@ -425,7 +474,7 @@ export default function ListingClient({ initialListing }: { initialListing: List
                   <>
                     <button onClick={handleMessage} disabled={messaging} className="w-full bg-[#111111] text-white text-[14px] font-semibold py-3.5 rounded-xl hover:bg-[#333] transition-colors disabled:opacity-60 mb-2 flex items-center justify-center gap-2">
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                      {messaging ? 'Opening chat…' : isNegBuyer ? 'Continue negotiation' : 'Message seller'}
+                      {messaging ? 'Opening chat…' : isNegBuyer ? 'Continue negotiation' : 'Message to get info on car'}
                     </button>
                     {msgError && <p className="text-[12px] text-red-600 mb-2">{msgError}</p>}
                     <button onClick={() => { if (!user) { router.push(`/auth/login?next=/listing/${listing.id}`); return } setOfferAmount(''); setOfferError(''); setOfferOpen(true) }} className="w-full border border-[#E5E5E5] text-[#111111] text-[14px] font-semibold py-3 rounded-xl hover:border-[#111111] transition-colors mb-2">
@@ -481,7 +530,7 @@ export default function ListingClient({ initialListing }: { initialListing: List
               ) : (
                 <>
                   <button onClick={handleMessage} disabled={messaging} className="flex-1 bg-[#111111] text-white text-[14px] font-semibold py-3.5 rounded-xl hover:bg-[#333] transition-colors disabled:opacity-60">
-                    {messaging ? 'Opening…' : isNegBuyer ? 'Continue' : 'Message seller'}
+                    {messaging ? 'Opening…' : isNegBuyer ? 'Continue' : 'Get info'}
                   </button>
                   <button onClick={() => { if (!user) { router.push(`/auth/login?next=/listing/${listing.id}`); return } setOfferAmount(''); setOfferError(''); setOfferOpen(true) }} className="border border-[#E5E5E5] text-[#111111] text-[14px] font-semibold px-4 py-3.5 rounded-xl hover:border-[#111111] transition-colors">
                     Offer
