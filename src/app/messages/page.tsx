@@ -7,7 +7,7 @@ import Navbar from '@/components/Navbar'
 import { useAuth } from '@/context/AuthContext'
 import { createClient } from '@/lib/supabase/client'
 import { enablePush, pushStatus } from '@/lib/push'
-import { timeAgo } from '@/lib/utils'
+import { timeAgo, storageImage } from '@/lib/utils'
 import type { Conversation } from '@/lib/types'
 
 export default function MessagesPage() {
@@ -132,7 +132,7 @@ export default function MessagesPage() {
             return (
               <Link key={c.id} href={`/messages/${c.id}`} className="bg-white border border-[#E5E5E5] rounded-2xl p-4 flex items-center gap-4 hover:shadow-[0_4px_20px_rgba(0,0,0,0.08)] hover:border-transparent transition-all group">
                 <div className="w-14 h-14 rounded-xl overflow-hidden bg-[#F5F5F3] shrink-0">
-                  <img src={c.listing_image || 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=120&q=70'} alt="" className="w-full h-full object-cover" />
+                  <img src={storageImage(c.listing_image, { width: 120, quality: 65 }) || 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=120&q=70'} alt="" className="w-full h-full object-cover" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2 mb-0.5">

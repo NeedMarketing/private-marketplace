@@ -8,7 +8,7 @@ import BetaStats from '@/components/BetaStats'
 import ImageCropper from '@/components/ImageCropper'
 import { useAuth } from '@/context/AuthContext'
 import { createClient } from '@/lib/supabase/client'
-import { formatPrice, formatMileage, timeAgo } from '@/lib/utils'
+import { formatPrice, formatMileage, timeAgo, storageImage } from '@/lib/utils'
 import type { Listing, Conversation } from '@/lib/types'
 
 const inp = "w-full border border-[#E5E5E5] rounded-xl px-4 py-3 text-[14px] text-[#111111] placeholder:text-[#6B6B6B] outline-none focus:border-[#111111] transition-colors bg-white"
@@ -239,7 +239,7 @@ function MyListingCard({ listing, onEdit, onDelete, onMarkSold }: { listing: Lis
     // neighbouring cards in the grid.
     <div className={`relative bg-white border border-[#E5E5E5] rounded-2xl shadow-[0_2px_12px_rgba(0,0,0,0.05)] hover:shadow-[0_6px_24px_rgba(0,0,0,0.09)] transition-all ${menuOpen ? 'z-30' : ''}`}>
       <div className="relative rounded-t-2xl overflow-hidden" style={{ aspectRatio: '16/9' }}>
-        <img src={listing.images[0] || 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=480&q=75'} alt="" className="w-full h-full object-cover" />
+        <img src={storageImage(listing.images[0], { width: 480, quality: 70 }) || 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=480&q=75'} alt="" className="w-full h-full object-cover" />
         <span className={`absolute top-3 left-3 text-[11px] font-semibold px-2.5 py-1 rounded-full ${listing.status === 'sold' ? 'bg-[#111111] text-white' : listing.status === 'draft' ? 'bg-amber-100 text-amber-800' : 'bg-white text-[#111111]'}`}>
           {listing.status === 'sold' ? 'Sold' : listing.status === 'draft' ? 'Draft' : 'Active'}
         </span>
@@ -472,7 +472,7 @@ export default function DashboardPage() {
                   return (
                     <Link key={c.id} href={`/messages/${c.id}`} className="bg-white border border-[#E5E5E5] rounded-2xl p-4 flex items-center gap-4 hover:shadow-[0_4px_16px_rgba(0,0,0,0.08)] transition-all">
                       <div className="w-12 h-12 rounded-xl overflow-hidden bg-[#F5F5F3] shrink-0">
-                        <img src={c.listing_image || 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=120&q=70'} alt="" className="w-full h-full object-cover" />
+                        <img src={storageImage(c.listing_image, { width: 120, quality: 65 }) || 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=120&q=70'} alt="" className="w-full h-full object-cover" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2 mb-0.5">

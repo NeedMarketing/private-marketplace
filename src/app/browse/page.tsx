@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Navbar from '@/components/Navbar'
 import { createClient } from '@/lib/supabase/client'
-import { formatPrice, formatMileage } from '@/lib/utils'
+import { formatPrice, formatMileage, storageImage } from '@/lib/utils'
 import type { Listing } from '@/lib/types'
 import Link from 'next/link'
 
@@ -50,7 +50,7 @@ function Card({ l, saved, onToggle }: { l: ListingCard; saved: boolean; onToggle
       <div className="bg-white rounded-xl border border-[#E5E5E5] shadow-[0_1px_6px_rgba(0,0,0,0.05)] hover:shadow-[0_6px_20px_rgba(0,0,0,0.10)] transition-all duration-200 overflow-hidden">
         <div className="relative overflow-hidden bg-[#F5F5F3]" style={{ aspectRatio: '1/1' }}>
           <img
-            src={l.images[0] || 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=480&q=75'}
+            src={storageImage(l.images[0], { width: 480, quality: 70 }) || 'https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=480&q=75'}
             alt={`${l.year} ${l.make} ${l.model}`}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             loading="lazy"

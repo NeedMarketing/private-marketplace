@@ -7,7 +7,7 @@ import Navbar from '@/components/Navbar'
 import { useAuth } from '@/context/AuthContext'
 import { createClient } from '@/lib/supabase/client'
 import { notifyNewMessage } from '@/lib/push'
-import { formatPrice, timeAgo } from '@/lib/utils'
+import { formatPrice, timeAgo, storageImage } from '@/lib/utils'
 import type { Conversation, Message, Listing, Offer } from '@/lib/types'
 
 export default function ThreadPage({ params }: { params: { id: string } }) {
@@ -104,6 +104,8 @@ export default function ThreadPage({ params }: { params: { id: string } }) {
     // Realtime isn't enabled for this table. Deduped by id, so it never doubles
     // up with the realtime/optimistic paths.
     const poll = setInterval(async () => {
+      // Skip polling when the tab is hidden — saves a lot of needless requests.
+      if (typeof document !== 'undefined' && document.hidden) return
       const { data: fresh } = await supabase
         .from('messages')
         .select('id, conversation_id, sender_id, sender_name, text, created_at')
@@ -117,7 +119,7 @@ export default function ThreadPage({ params }: { params: { id: string } }) {
           return Array.from(byId.values()).sort((a, b) => a.created_at.localeCompare(b.created_at))
         })
       }
-    }, 4000)
+    }, 12000)
 
     return () => { supabase.removeChannel(channel); clearInterval(poll) }
   }, [params.id, user, router, loading])
@@ -238,7 +240,7 @@ export default function ThreadPage({ params }: { params: { id: string } }) {
           {listing && (
             <Link href={`/listing/${listing.id}`} className="flex items-center gap-3 flex-1 min-w-0 group">
               <div className="w-10 h-10 rounded-xl overflow-hidden bg-[#F5F5F3] shrink-0">
-                <img src={listing.images[0] || ''} alt="" className="w-full h-full object-cover" />
+                <img src={storageImage(listing.images[0], { width: 80, quality: 65 })} alt="" className="w-full h-full object-cover" />
               </div>
               <div className="min-w-0">
                 <p className="text-[13px] font-semibold text-[#111111] truncate group-hover:underline">{conversation?.listing_title}</p>
