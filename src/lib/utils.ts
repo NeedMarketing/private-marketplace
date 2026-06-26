@@ -6,27 +6,24 @@ export function formatMileage(n: number): string {
   return n.toLocaleString('en-US') + ' mi'
 }
 
-// Returns a resized/optimized version of an image URL.
-// - Supabase Storage URLs are routed through the image-transformation endpoint
-//   (/render/image/public/) with width + quality params so we never download the
-//   full original file for a thumbnail or card.
-// - Unsplash URLs get width/quality query params.
+// Returns an optimized image URL.
+// - Supabase Storage URLs are served AS-IS (the original public file). We do NOT
+//   use Supabase's /render/image transform endpoint — the Pro plan only includes
+//   100 image transformations/month and it blows the quota fast. Uploads are
+//   already cropped to a reasonable size by the sell/edit cropper, and bandwidth
+//   is well within plan limits, so serving originals is the cheaper choice.
+// - Unsplash URLs get free CDN width/quality query params.
 // - Anything else is returned unchanged.
 export function storageImage(url: string | undefined, opts: { width: number; quality?: number }): string {
   if (!url) return ''
   const { width, quality = 75 } = opts
-
-  if (url.includes('/storage/v1/object/public/')) {
-    const transformed = url.replace('/storage/v1/object/public/', '/storage/v1/render/image/public/')
-    const sep = transformed.includes('?') ? '&' : '?'
-    return `${transformed}${sep}width=${width}&quality=${quality}&resize=cover`
-  }
 
   if (url.includes('images.unsplash.com')) {
     const base = url.split('?')[0]
     return `${base}?w=${width}&q=${quality}`
   }
 
+  // Supabase storage (and everything else): serve the original, no transformation.
   return url
 }
 
